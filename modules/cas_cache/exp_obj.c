@@ -30,7 +30,10 @@ static inline void bd_release_from_disk(struct block_device *bdev,
 	return bd_unlink_disk_holder(bdev, disk);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+// [CSU] modified below kernel version check from 5.18.X to 5.14.X
+// as the kernel in Centos Stream 9 (5.14.0-252 at time of writing)
+// seems to have backported fixes that affect the required MAKE_RQ_RET_TYPE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
 	#define KRETURN(x) 	return
 	#define MAKE_RQ_RET_TYPE void
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 3, 0)
