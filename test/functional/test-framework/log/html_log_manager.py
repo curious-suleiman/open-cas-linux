@@ -26,6 +26,7 @@ class HtmlLogManager(BaseLog):
 
     def begin(self, message):
         self._files_path = self._config.create_html_test_log(message)
+        print(f"Attempting to start a new HTML log at {self._files_path}")
         self._main = HtmlMainLog(message, self._config)
         self._log_setup = HtmlSetupLog(message, config=self._config)
         self._current_log = self._log_setup

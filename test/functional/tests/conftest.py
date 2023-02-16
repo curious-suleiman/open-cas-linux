@@ -231,6 +231,7 @@ def base_prepare(item):
         TestRun.executor.run("pkill --signal=SIGKILL fsck")
         Udev.enable()
         kill_all_io()
+        # [CSU] this call should be modified to not remove the root/swap devices
         DeviceMapper.remove_all()
 
         if installer.check_if_installed():
@@ -251,6 +252,7 @@ def base_prepare(item):
 
         lvms = Lvm.discover()
         if lvms:
+            # [CSU] this call should be modified to not remove the root/swap LVs
             Lvm.remove_all()
             LvmConfiguration.remove_filters_from_config()
 

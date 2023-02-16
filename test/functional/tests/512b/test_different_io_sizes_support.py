@@ -24,7 +24,11 @@ mountpoint = "/tmp/diff_io_size_support_test"
 
 
 @pytest.mark.parametrizex("cache_mode", [CacheMode.WB, CacheMode.WT])
-@pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
+# [CSU] According to find_disks in the disk_finder.py module, the 'SSD' detection methodology will
+# only find Intel SSDs (via the intelmas command)
+# since these tests are being run in a virtual machine without Intel-specific SSDs, allow the
+# cache device to be of type 'hdd'
+@pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand, DiskType.hdd]))
 @pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd, DiskType.nand]))
 def test_support_different_io_size(cache_mode):
     """

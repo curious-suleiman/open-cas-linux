@@ -202,7 +202,13 @@ def __makereport(cls, item, call, res):
             cls.LOGGER.exception(msg)
     elif res.when == "setup" and res.failed:
         msg = f"{call.excinfo.type.__name__}: {call.excinfo.value}"
-        cls.LOGGER.exception(msg)
+        try:
+	        cls.LOGGER.exception(msg)
+        except:
+            #import traceback
+            #traceback.print_tb(call.excinfo.traceback)
+            
+            raise Exception(f"Exception occured during setup and no logger configured - msg is: {msg} and traceback is:\n{call.excinfo.traceback}")
         res.outcome = "failed"
 
     if res.outcome == "skipped":

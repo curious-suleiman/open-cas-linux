@@ -21,6 +21,7 @@ class HtmlSetupLog(HtmlFileItemLog):
 
     def __init__(self, test_title, config, iteration_title="Test summary"):
         html_file_path = config.get_setup_file_path()
+        print(f"Attempting to create a HTML setup log at {html_file_path} with title {test_title} and iteration title {iteration_title}")
         super().__init__(html_file_path, test_title, config, iteration_title)
         self._last_iteration_title = ''
 

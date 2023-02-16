@@ -189,16 +189,19 @@ class DeviceMapper(LinuxCommand):
     @classmethod
     def remove_all(cls, force=True):
         TestRun.LOGGER.info("Removing all device mapper devices")
-
+        TestRun.LOGGER.info("NOTE: Device mapper device removal SKIPPED to avoid crashing this system by unmounting the root/swap devices")
+        
         cmd = "dmsetup remove_all"
         if force:
             cmd += " --force"
 
-        return TestRun.executor.run_expect_success(cmd)
+        #return TestRun.executor.run_expect_success(cmd)
+        return 0
 
     def __init__(self, name: str):
         LinuxCommand.__init__(self, TestRun.executor, "dmsetup")
         self.name = name
+        TestRun.LOGGER.info(f"Defining new device-mapper device with name {name} and path {self.get_path()}")
 
     @staticmethod
     def wrap_table(table: DmTable):

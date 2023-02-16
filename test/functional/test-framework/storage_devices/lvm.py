@@ -455,14 +455,22 @@ class Lvm(Disk):
 
     @classmethod
     def discover_logical_volumes(cls):
+        TestRun.LOGGER.info("Looking for logical volumes")
+        TestRun.LOGGER.info("Getting all volume groups")
         vol_groups = VolumeGroup.get_all_volume_groups()
+        TestRun.LOGGER.info(f"{len(vol_groups)} VGs found")
         volumes = []
+        TestRun.LOGGER.info("Getting all LVs for each volume group")
         for vg in vol_groups:
+            TestRun.LOGGER.info(f"Processing VG {vg}")
             lv_discovered = VolumeGroup.get_logical_volumes_path(vg)
             if lv_discovered:
+                TestRun.LOGGER.info(f"Discovered {len(lv_discovered)} LVs")
                 for lv_path in lv_discovered:
+                    TestRun.LOGGER.info(f"Activating LV {lv_path}")
                     cls.make_sure_lv_is_active(lv_path)
                     lv_name = lv_path.split('/')[-1]
+                    TestRun.LOGGER.info(f"Appending LV {lv_path}")
                     volumes.append(
                         cls(
                             readlink(lv_path),
@@ -471,7 +479,7 @@ class Lvm(Disk):
                         )
                     )
             else:
-                TestRun.LOGGER.info(f"No LVMs present in the system.")
+                TestRun.LOGGER.info(f"No LVMs present in VG {vg}.")
 
         return volumes
 
@@ -500,23 +508,29 @@ class Lvm(Disk):
 
     @classmethod
     def remove_all(cls):
+        # [CSU] don't nuke the current system
+        TestRun.LOGGER.info("NOTE: LV/VG/PV removal SKIPPED to avoid removing root/swap LVs")
+        
         cmd = f"lvdisplay | grep 'LV Path' | awk '{{print $3}}'"
         lvm_paths = TestRun.executor.run(cmd).stdout.splitlines()
         for lvm_path in lvm_paths:
             lv_name = lvm_path.split('/')[-1]
             vg_name = lvm_path.split('/')[-2]
-            cls.remove(lv_name, vg_name)
+            TestRun.LOGGER.info(f"NOTE: skipping removal of LV {vg_name}/{lv_name}")
+            #cls.remove(lv_name, vg_name)
 
         cmd = f"vgdisplay | grep 'VG Name' | awk '{{print $3}}'"
         vg_names = TestRun.executor.run(cmd).stdout.splitlines()
         for vg_name in vg_names:
-            TestRun.executor.run(f"vgchange -an {vg_name}")
-            VolumeGroup.remove(vg_name)
+            TestRun.LOGGER.info(f"NOTE: skipping removal of VG {vg_name}")
+            #TestRun.executor.run(f"vgchange -an {vg_name}")
+            #VolumeGroup.remove(vg_name)
 
         cmd = f"pvdisplay | grep 'PV Name' | awk '{{print $3}}'"
         pv_names = TestRun.executor.run(cmd).stdout.splitlines()
         for pv_name in pv_names:
-            cls.remove_pv(pv_name)
+            TestRun.LOGGER.info(f"NOTE: skipping removal of PV {pv_name}")
+            #cls.remove_pv(pv_name)
 
         TestRun.LOGGER.info(f"Successfully removed all LVMs.")
 
