@@ -432,8 +432,63 @@ class Lvm(Disk):
         # The purpose of this map is to inform the teardown process later as to which
         # LVM elements were created for the purpose of the test and so can be
         # safely removed without mangling the underlying system
+        # The format of this map is as follows:
+        #   lvm_map = {
+        #       'pvs': {
+        #           PV: {
+        #               'created': boolean, # whether the PV was created for the test (True), or already existed (False)
+        #               'vgs': [VG0, VG1, ..., VGn]  # names of associated VGs
+        #           }
+        #       },
+        #       'vgs': {
+        #           VG: {
+        #               'created': boolean, # as above, but for this VG
+        #               'pvs': [PV0, PV1, ..., PVn],  # names of associated PVs
+        #               'lvs': {
+        #                   LV: {
+        #                       'created': boolean, # as above, but for this LV
+        #                   }
+        #               }
+        #           }
+        #       }
+        #   }
+        lvm_map = {
+            'pvs': {},
+            'vgs': {}
+        }
 
-        logical_volumes = []
+        # first: discover existing VGs/PVs
+        # if any existing PV is found in 'devices', add it to the map with 'created' = false
+        # else, add it with 'created' = true
+        # for each PV added to the map, add any VGs currently linked to that PV to the map with
+        # 'created' = false
+        # ignore any PV that is not found in 'devices'
+        current_vgs = VolumeGroup.get_all_volume_groups()
+        provided_devices = devices if isinstance(devices, list) else [devices]
+        for vg_name, associated_pvs in current_vgs.items():
+            for associated_pv in associated_pvs:
+                if associated_pv in provided_devices:
+                    try:
+                        lvm_map_pv = lvm_map['pvs'][associated_pv]
+                    except KeyError:
+                        TestRun.LOGGER.info(f"Adding existing PV {associated_pv} to LVM map")
+                        lvm_map['pvs'][associated_pv] = lvm_map_pv = {
+                            'created': False,
+                            'vgs': {}
+                        }
+                    try:
+                        lvm_map_vg = lvm_map['vgs'][vg_name]
+                    except KeyError:
+                        TestRun.LOGGER.info(f"Adding existing VG {vg_name} to LVM map")
+                        lvm_map['vgs'][vg_name] = lvm_map_vg = {
+                            'created': False,
+                            'pvs': [],
+                            'lvs': {}
+                        }
+
+                    TestRun.LOGGER.info(f"Associating PV {associated_pv} with VG {vg_name} in LVM map")
+                    lvm_map_vg['pvs'].append(associated_pv)
+                    lvm_map_pv['vgs'].append(vg_name)
 
         for vg_iter in range(lvm_configuration.vg_num):
             if isinstance(devices, list):
@@ -443,18 +498,46 @@ class Lvm(Disk):
                 for i in range(start_range, end_range):
                     pv_devs.append(devices[i])
                 device_first = devices[0]
+                associated_pvs = pv_devs
             else:
                 pv_devs = devices
                 device_first = devices
+                associated_pvs = [devices]
 
             for _ in range(lv_per_vg):
                 lv = cls.create(lv_size_percentage, pv_devs)
-                logical_volumes.append(lv)
+                # insert the new LV into the lvm_map
+                try:
+                    lvm_map_vg = lvm_map['vgs'][lv.volume_group.name]
+                except KeyError:
+                    TestRun.LOGGER.info(f"Adding new VG {lv.volume_group.name} to LVM map")
+                    lvm_map['vgs'][lv.volume_group.name] = lvm_map_vg = {
+                        'created': True,
+                        'pvs': [],
+                        'lvs': {}
+                    }
+
+                TestRun.LOGGER.info(f"Adding new VG {lv.volume_group.name} to LVM map")
+                lvm_map_vg['lvs'][lv.volume_name] = {
+                    'created': True
+                }
+                for associated_pv in associated_pvs:
+                    if associated_pv not in lvm_map['pvs']:
+                        TestRun.LOGGER.info(f"Adding new PV {associated_pv} to LVM map")
+                        lvm_map['pvs'][associated_pv] = {
+                            'created': True,
+                            'vgs': []
+                        }
+                    if associated_pv not in lvm_map_vg['pvs']:
+                        lvm_map_vg['pvs'].append(associated_pv)
+                        lvm_map['pvs'][associated_pv]['vgs'].append(lv.volume_group.name)
 
             if lvm_as_core:
                 cls.configure_global_filter(device_first, lv_per_vg, pv_devs)
 
-        return logical_volumes
+        # return logical_volumes
+        # TODO: ensure callers of this method are updated to match the new return value
+        return lvm_map
 
     @classmethod
     def create(
@@ -462,7 +545,7 @@ class Lvm(Disk):
             volume_size_or_percent: Union[Size, int],
             devices: Union[List[Device], Device],
             name: str = None
-    ):
+    ) -> 'Lvm':
         if isinstance(volume_size_or_percent, Size):
             size_cmd = f"--size {volume_size_or_percent.get_value()}B"
         elif isinstance(volume_size_or_percent, int):
@@ -546,15 +629,30 @@ class Lvm(Disk):
     @classmethod
     def remove_specific_lvm_configuration(
             cls,
-            lvm_configuration: LvmConfiguration
+            lvm_map     # see create_specific_lvm_configuration for a description of this structure
     ):
         """Removes all LVs in the given configuration, as well as associated VGs/PVs (if possible).
         
         """
         
-        # Get the LVs/VGs from the given config
-        # Remove each LV
+        # TODO: define lvm_map as a specific class rather than nested dict
+
+        # For each VG in lvm_map['vgs']:
+        #       For each LV in VG['lvs']:
+        #           if LV['created'] == True, remove the LV and remove the LV name from VG['lvs'] once confirmed
+        #       If VG['created'] == True AND VG['lvs'] is empty:
+        #           remove the VG
+        #           For each PV in VG['pvs']:
+        #               remove the VG name from lvm_map['pvs'][PV]
+        #           remove the VG name from lvm_map['vgs'] once confirmed
+        # For each PV in lvm_map['pvs']:
+        #       If PV['created'] == True AND PV['vgs'] is empty:
+        #           remove the PV and remove the PV name from lvm_map['pvs'] once confirmed
         # 
+        # Any remaining PVs/VGs/LVs were either not created for the purposes of the test, or cannot be removed without
+        # breaking a PV/VG/LV dependency that was present before the test 
+
+        # TODO: implementation
 
         pass
 
