@@ -30,7 +30,7 @@ def test_cas_version():
      - casadm command succeeds
      - Versions are matched from cmd and file in /var/lib/opencas/cas_version
     """
-    cmd = f"casadm --version -o csv"
+    cmd = "casadm --version -o csv"
     output = TestRun.executor.run_expect_success(cmd).stdout
     cmd_cas_versions = output.split("\n")[1:]
 

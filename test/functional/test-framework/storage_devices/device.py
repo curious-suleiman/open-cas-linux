@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 import posixpath
+from typing import List
 
 from core.test_run import TestRun
 from test_tools import disk_utils, fs_utils
@@ -37,7 +38,7 @@ class Device:
             self.mount_point = mount_point_line[0:mount_point_line.find(device_path)].strip()
             return True
 
-    def mount(self, mount_point, options: [str] = None):
+    def mount(self, mount_point, options: List[str] = None):
         if not self.is_mounted():
             if disk_utils.mount(self, mount_point, options):
                 self.mount_point = mount_point

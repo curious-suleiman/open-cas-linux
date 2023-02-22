@@ -187,16 +187,37 @@ class DmTable:
 
 class DeviceMapper(LinuxCommand):
     @classmethod
-    def remove_all(cls, force=True):
+    def _remove_all(cls, force=True):
+        """Removes _all_ device mapper devices in the system.
+
+        Note: DO NOT USE - if the currently running system relies on one or more DMs (for
+        example, root/swap DMs) then this command will force remove them and the current system will
+        stop functioning and require a reboot.
+
+        If a test requires the creation, use, and cleanup of DMs, then it should:
+            - Get a list of existing DMs during test setup
+            - Run whatever actions it needs to
+            - Cleanup any DMs that were not in the original list discovered during test
+            setup
+
+        A test should not try to wipe all DMs during test setup to ensure a clean slate. If
+        a previous test created DMs and did not clean them up properly, this is a fault of
+        the _cleanup_ process, not a problem for the next test's setup process to try to resolve.
+
+        Formerly remove_all(cls, force=True) - method renamed to force breakage for callers
+        """
+
         TestRun.LOGGER.info("Removing all device mapper devices")
         TestRun.LOGGER.info("NOTE: Device mapper device removal SKIPPED to avoid crashing this system by unmounting the root/swap devices")
         
-        cmd = "dmsetup remove_all"
-        if force:
-            cmd += " --force"
-
-        #return TestRun.executor.run_expect_success(cmd)
         return 0
+
+        # cmd = "dmsetup remove_all"
+        # if force:
+        #     cmd += " --force"
+
+        # return TestRun.executor.run_expect_success(cmd)
+        
 
     def __init__(self, name: str):
         LinuxCommand.__init__(self, TestRun.executor, "dmsetup")

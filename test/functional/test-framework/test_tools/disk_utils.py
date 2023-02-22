@@ -7,6 +7,7 @@ import posixpath
 import re
 import time
 from enum import Enum
+from typing import List
 
 from core.test_run import TestRun
 from test_tools import fs_utils
@@ -284,7 +285,7 @@ def remove_partitions(device):
     return True
 
 
-def mount(device, mount_point, options: [str] = None):
+def mount(device, mount_point, options: List[str] = None):
     if not fs_utils.check_if_directory_exists(mount_point):
         fs_utils.create_directory(mount_point, True)
     TestRun.LOGGER.info(f"Mounting device {device.path} ({device.get_device_id()}) "

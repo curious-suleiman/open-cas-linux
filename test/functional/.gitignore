@@ -1,3 +1,6 @@
 lib/external_plugins
 results/
 config/dut_config.yml
+fio_run_*
+local-fio*
+local-job*

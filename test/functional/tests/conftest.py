@@ -296,7 +296,7 @@ def base_prepare(item):
             installer.set_up_opencas(cas_version)
 
         TestRun.usr.already_updated = True
-        TestRun.LOGGER.add_build_info(f'Commit hash:')
+        TestRun.LOGGER.add_build_info('Commit hash:')
         TestRun.LOGGER.add_build_info(f"{git.get_current_commit_hash()}")
-        TestRun.LOGGER.add_build_info(f'Commit message:')
+        TestRun.LOGGER.add_build_info('Commit message:')
         TestRun.LOGGER.add_build_info(f'{git.get_current_commit_message()}')

@@ -28,8 +28,9 @@ mountpoint = "/tmp/diff_io_size_support_test"
 # only find Intel SSDs (via the intelmas command)
 # since these tests are being run in a virtual machine without Intel-specific SSDs, allow the
 # cache device to be of type 'hdd'
-@pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand, DiskType.hdd]))
-@pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd, DiskType.nand]))
+# [CSU] edit: removing 'hdd' from cache device after reconfiguring test hardware
+@pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
+@pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd]))
 def test_support_different_io_size(cache_mode):
     """
     title: OpenCAS supports different IO sizes

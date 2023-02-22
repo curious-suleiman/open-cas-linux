@@ -203,7 +203,7 @@ def __makereport(cls, item, call, res):
     elif res.when == "setup" and res.failed:
         msg = f"{call.excinfo.type.__name__}: {call.excinfo.value}"
         try:
-	        cls.LOGGER.exception(msg)
+            cls.LOGGER.exception(msg)
         except:
             #import traceback
             #traceback.print_tb(call.excinfo.traceback)

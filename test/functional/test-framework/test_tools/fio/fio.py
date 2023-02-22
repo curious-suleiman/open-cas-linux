@@ -50,6 +50,23 @@ class Fio:
         if "time_based" not in self.global_cmd_parameters.command_flags:
             return self.default_run_time
 
+        # [CSU] If fio is set to time_based mode, then it will continue running the
+        # defined workload until runtime is reached (repeating the workload if
+        # required)
+        # If the executor timeout is set to the same value as the runtime in this case, then
+        # it is highly likely that the executor will hit its timeout at the same time as
+        # the fio process will hit its timeout
+        # this will result in the fio execution being judged as a failure (with a TimeoutExpired
+        # exception) even though in time_based mode it will always hit this exception
+        # because fio is instructed to run for this amount of time regardless of the
+        # workload definition
+        # So, if time_based is set, then an allowance has to be added to the executor timeout
+        # time to allow fio to start, run for the specified runtime + ramp_time, stop, and
+        # then cleanup before the executor terminates the process
+        # for now, use a fixed value of 60s
+        # future: use a scaling value based on the specified runtime + ramp_time, between a fixed min/max
+        total_time_allowance = 60
+    
         total_time = self.global_cmd_parameters.get_parameter_value("runtime")
         if len(total_time) != 1:
             raise ValueError("Wrong fio 'runtime' parameter configuration")
@@ -60,7 +77,7 @@ class Fio:
                 raise ValueError("Wrong fio 'ramp_time' parameter configuration")
             ramp_time = int(ramp_time[0])
             total_time += ramp_time
-        return datetime.timedelta(seconds=total_time)
+        return datetime.timedelta(seconds=total_time + total_time_allowance)
 
     def run(self, timeout: datetime.timedelta = None):
         if timeout is None:

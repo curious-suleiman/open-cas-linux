@@ -228,7 +228,9 @@ def test_multistream_seq_cutoff_stress_fs(streams_seq_rand, filesystem, cache_mo
     with TestRun.step("Run I/O"):
         sequential_streams = streams_seq_rand[0]
         random_streams = streams_seq_rand[1]
-        stream_size = core_disk.size / 256
+        #stream_size = core_disk.size / 256
+        # [CSU] Cap the size of each stream, similar to the above test_multistream_seq_cutoff_stress_raw test
+        stream_size = min(core_disk.size / 256, Size(256, Unit.MebiByte))
         fio = (Fio().create_command()
                .io_engine(IoEngine.libaio)
                .block_size(Size(1, Unit.Blocks4096))

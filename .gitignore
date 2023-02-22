@@ -15,3 +15,17 @@ modules.order
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Ignore built packages
+packages/*
+
+# Ignore built 'casadm' executable
+casadm/casadm
+
+# Ignore module build outputs
+modules/cas_cache/cas_cache.mod
+modules/generated_defines.h
+modules/include/ocf/*
+
+# Ignore other build outputs
+config.out
