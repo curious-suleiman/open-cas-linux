@@ -4,7 +4,7 @@
 #
 import threading
 
-from typing import Union, List, Tuple
+from typing import Union, List, Tuple, Dict
 from datetime import datetime
 import os.path as ospath
 
@@ -419,13 +419,135 @@ class Lvm(Disk):
             devices: Union[List[Device], Device],
             lvm_configuration: LvmConfiguration,
             lvm_as_core: bool = False
-    ):
+    ) -> Tuple[List['Lvm'], Dict]:
         pv_per_vg = int(lvm_configuration.pv_num / lvm_configuration.vg_num)
         lv_per_vg = int(lvm_configuration.lv_num / lvm_configuration.vg_num)
         lv_size_percentage = int(100 / lv_per_vg)
 
         LvmConfiguration.configure_filters(lvm_configuration.lvm_filters, devices)
 
+        lvm_map: dict = None  # this will be iteratively updated as required by the cls.create() call further down
+        created_lvs: List['Lvm'] = []
+
+        for vg_iter in range(lvm_configuration.vg_num):
+            if isinstance(devices, list):
+                pv_devs = []
+                start_range = vg_iter * pv_per_vg
+                end_range = start_range + pv_per_vg
+                for i in range(start_range, end_range):
+                    pv_devs.append(devices[i])
+                device_first = devices[0]
+            else:
+                pv_devs = devices
+                device_first = devices
+
+            for _ in range(lv_per_vg):
+                lv, lvm_map = cls.create(lv_size_percentage, pv_devs, lvm_map=lvm_map)
+                created_lvs.append(lv)
+
+            if lvm_as_core:
+                cls.configure_global_filter(device_first, lv_per_vg, pv_devs)
+
+        # return logical_volumes
+        # TODO: ensure callers of this method are updated to match the new return value
+        return created_lvs, lvm_map
+
+    @classmethod
+    def create(
+            cls,
+            volume_size_or_percent: Union[Size, int],
+            devices: Union[List[Device], Device],
+            name: str = None,
+            lvm_map: Dict = None
+    ) -> Tuple['Lvm', Dict]:
+        if isinstance(volume_size_or_percent, Size):
+            size_cmd = f"--size {volume_size_or_percent.get_value()}B"
+        elif isinstance(volume_size_or_percent, int):
+            size_cmd = f"--extents {volume_size_or_percent}%VG"
+        else:
+            TestRun.LOGGER.error("Incorrect type of the first argument (volume_size_or_percent).")
+
+        if not name:
+            name = cls.__get_unique_lv_name()
+
+        devices_paths = cls.get_devices_path(devices)
+        device_list = devices if isinstance(devices, list) else [devices]
+        dev_number = len(device_list)
+
+        if lvm_map is None:
+            lvm_map = cls.discover_lvm_map()
+        
+        vg = VolumeGroup.is_vg_already_present(dev_number, devices_paths)
+        if vg:
+            lvm_map_vg = lvm_map['vgs'][vg.name]
+        else:
+            vg = VolumeGroup.create(devices_paths)
+            TestRun.LOGGER.info(f"Adding new VG {vg.name} to LVM map")
+            lvm_map['vgs'][vg.name] = lvm_map_vg = {
+                'created': True,
+                'pvs': [],
+                'lvs': {}
+            }
+
+        lv = cls.__create(name, size_cmd, vg)
+        
+        # insert the new LV into the lvm_map
+        TestRun.LOGGER.info(f"Adding new LV {lv.volume_name} to LVM map")
+        lvm_map_vg['lvs'][lv.volume_name] = {
+            'created': True
+        }
+        for device in devices:
+            if device not in lvm_map['pvs']:
+                TestRun.LOGGER.info(f"Adding new PV {device} to LVM map")
+                lvm_map['pvs'][device] = {
+                    'created': True,
+                    'vgs': []
+                }
+            if device not in lvm_map_vg['pvs']:
+                lvm_map_vg['pvs'].append(device)
+                lvm_map['pvs'][device]['vgs'].append(lv.volume_name)
+
+        return lv, lvm_map
+
+    @staticmethod
+    def get_devices_path(devices: Union[List[Device], Device]):
+        if isinstance(devices, list):
+            return " ".join([Symlink(dev.path).get_target() for dev in devices])
+        else:
+            return Symlink(devices.path).get_target()
+
+    @classmethod
+    def discover_logical_volumes(cls):
+        TestRun.LOGGER.info("Looking for logical volumes")
+        TestRun.LOGGER.info("Getting all volume groups")
+        vol_groups = VolumeGroup.get_all_volume_groups()
+        TestRun.LOGGER.info(f"{len(vol_groups)} VGs found")
+        volumes = []
+        TestRun.LOGGER.info("Getting all LVs for each volume group")
+        for vg in vol_groups:
+            TestRun.LOGGER.info(f"Processing VG {vg}")
+            lv_discovered = VolumeGroup.get_logical_volumes_path(vg)
+            if lv_discovered:
+                TestRun.LOGGER.info(f"Discovered {len(lv_discovered)} LVs")
+                for lv_path in lv_discovered:
+                    TestRun.LOGGER.info(f"Activating LV {lv_path}")
+                    cls.make_sure_lv_is_active(lv_path)
+                    lv_name = lv_path.split('/')[-1]
+                    TestRun.LOGGER.info(f"Appending LV {lv_path}")
+                    volumes.append(
+                        cls(
+                            readlink(lv_path),
+                            VolumeGroup(vg),
+                            lv_name
+                        )
+                    )
+            else:
+                TestRun.LOGGER.info(f"No LVMs present in VG {vg}.")
+
+        return volumes
+
+    @classmethod
+    def discover_lvm_map(cls):
         # Construct PV : VG : LV map for newly-created LVM elements
         # Note that if any of the given devices are not already configured as PVs,
         # they will automatically be configured as PVs during VG creation
@@ -490,119 +612,6 @@ class Lvm(Disk):
                     lvm_map_vg['pvs'].append(associated_pv)
                     lvm_map_pv['vgs'].append(vg_name)
 
-        for vg_iter in range(lvm_configuration.vg_num):
-            if isinstance(devices, list):
-                pv_devs = []
-                start_range = vg_iter * pv_per_vg
-                end_range = start_range + pv_per_vg
-                for i in range(start_range, end_range):
-                    pv_devs.append(devices[i])
-                device_first = devices[0]
-                associated_pvs = pv_devs
-            else:
-                pv_devs = devices
-                device_first = devices
-                associated_pvs = [devices]
-
-            for _ in range(lv_per_vg):
-                lv = cls.create(lv_size_percentage, pv_devs)
-                # insert the new LV into the lvm_map
-                try:
-                    lvm_map_vg = lvm_map['vgs'][lv.volume_group.name]
-                except KeyError:
-                    TestRun.LOGGER.info(f"Adding new VG {lv.volume_group.name} to LVM map")
-                    lvm_map['vgs'][lv.volume_group.name] = lvm_map_vg = {
-                        'created': True,
-                        'pvs': [],
-                        'lvs': {}
-                    }
-
-                TestRun.LOGGER.info(f"Adding new VG {lv.volume_group.name} to LVM map")
-                lvm_map_vg['lvs'][lv.volume_name] = {
-                    'created': True
-                }
-                for associated_pv in associated_pvs:
-                    if associated_pv not in lvm_map['pvs']:
-                        TestRun.LOGGER.info(f"Adding new PV {associated_pv} to LVM map")
-                        lvm_map['pvs'][associated_pv] = {
-                            'created': True,
-                            'vgs': []
-                        }
-                    if associated_pv not in lvm_map_vg['pvs']:
-                        lvm_map_vg['pvs'].append(associated_pv)
-                        lvm_map['pvs'][associated_pv]['vgs'].append(lv.volume_group.name)
-
-            if lvm_as_core:
-                cls.configure_global_filter(device_first, lv_per_vg, pv_devs)
-
-        # return logical_volumes
-        # TODO: ensure callers of this method are updated to match the new return value
-        return lvm_map
-
-    @classmethod
-    def create(
-            cls,
-            volume_size_or_percent: Union[Size, int],
-            devices: Union[List[Device], Device],
-            name: str = None
-    ) -> 'Lvm':
-        if isinstance(volume_size_or_percent, Size):
-            size_cmd = f"--size {volume_size_or_percent.get_value()}B"
-        elif isinstance(volume_size_or_percent, int):
-            size_cmd = f"--extents {volume_size_or_percent}%VG"
-        else:
-            TestRun.LOGGER.error("Incorrect type of the first argument (volume_size_or_percent).")
-
-        if not name:
-            name = cls.__get_unique_lv_name()
-
-        devices_paths = cls.get_devices_path(devices)
-        dev_number = len(devices) if isinstance(devices, list) else 1
-
-        vg = VolumeGroup.is_vg_already_present(dev_number, devices_paths)
-
-        if not vg:
-            vg = VolumeGroup.create(devices_paths)
-
-        return cls.__create(name, size_cmd, vg)
-
-    @staticmethod
-    def get_devices_path(devices: Union[List[Device], Device]):
-        if isinstance(devices, list):
-            return " ".join([Symlink(dev.path).get_target() for dev in devices])
-        else:
-            return Symlink(devices.path).get_target()
-
-    @classmethod
-    def discover_logical_volumes(cls):
-        TestRun.LOGGER.info("Looking for logical volumes")
-        TestRun.LOGGER.info("Getting all volume groups")
-        vol_groups = VolumeGroup.get_all_volume_groups()
-        TestRun.LOGGER.info(f"{len(vol_groups)} VGs found")
-        volumes = []
-        TestRun.LOGGER.info("Getting all LVs for each volume group")
-        for vg in vol_groups:
-            TestRun.LOGGER.info(f"Processing VG {vg}")
-            lv_discovered = VolumeGroup.get_logical_volumes_path(vg)
-            if lv_discovered:
-                TestRun.LOGGER.info(f"Discovered {len(lv_discovered)} LVs")
-                for lv_path in lv_discovered:
-                    TestRun.LOGGER.info(f"Activating LV {lv_path}")
-                    cls.make_sure_lv_is_active(lv_path)
-                    lv_name = lv_path.split('/')[-1]
-                    TestRun.LOGGER.info(f"Appending LV {lv_path}")
-                    volumes.append(
-                        cls(
-                            readlink(lv_path),
-                            VolumeGroup(vg),
-                            lv_name
-                        )
-                    )
-            else:
-                TestRun.LOGGER.info(f"No LVMs present in VG {vg}.")
-
-        return volumes
-
     @classmethod
     def discover(cls):
         TestRun.LOGGER.info("Discover LVMs in system...")
@@ -652,9 +661,52 @@ class Lvm(Disk):
         # Any remaining PVs/VGs/LVs were either not created for the purposes of the test, or cannot be removed without
         # breaking a PV/VG/LV dependency that was present before the test 
 
-        # TODO: implementation
+        vgs_removed = []
+        for vg_name, vg in lvm_map['vgs'].items():
+            TestRun.LOGGER.info(f'LVM cleanup: processing VG {vg_name}')
+            lvs_removed = []
+            for lv_name, lv in vg['lvs'].items():
+                if lv['created']:
+                    TestRun.LOGGER.info(f'Removing created LV {lv_name}')
+                    cls.remove(lv_name, vg_name)
+                    lvs_removed.append(lv_name)
+                else:
+                    TestRun.LOGGER.info(f'Skipping removing existing LV {lv_name}')
+            for lv_removed in lvs_removed:
+                del vg['lvs'][lv_removed]
+            if vg['created']:
+                if len(vg['lvs']) == 0:
+                    TestRun.LOGGER.info(f'Removing created VG {vg_name}')
+                    TestRun.executor.run(f"vgchange -an {vg_name}")
+                    VolumeGroup.remove(vg_name)
+                    for associated_pv in vg['pvs']:
+                        TestRun.LOGGER.info(f'Removing created VG {vg_name} from associated PV {associated_pv}')
+                        del lvm_map['pvs'][associated_pv]['vgs'][lvm_map['pvs'][associated_pv]['vgs'].index(vg_name)]
+                    vgs_removed.append(vg_name)
+                else:
+                    TestRun.LOGGER.info(f'Skipping removing created VG {vg_name} - one or more LVs still remaining in group')
+            else:
+                TestRun.LOGGER.info(f'Skipping removing existing VG {vg_name}')
 
-        pass
+        for vg_removed in vgs_removed:
+            del lvm_map['vgs'][vg_removed]
+        
+        pvs_removed = []
+        for pv_name, pv in lvm_map['pvs'].items():
+            if pv['created']:
+                if len(pv['vgs']) == 0:
+                    TestRun.LOGGER.info(f'Removing created PV {pv_name}')
+                    cls.remove_pv(pv_name)
+                    pvs_removed.append(pv_name)
+                else:
+                    TestRun.LOGGER.info(f'Skipping removing created PV {pv_name} - one or more VGs still associated with PV')
+            else:
+                TestRun.LOGGER.info(f'Skipping removing existing PV {pv_name}')
+        
+        for pv_removed in pvs_removed:
+            del lvm_map['pvs'][pv_removed]
+
+        return True
 
     @classmethod
     def _remove_all(cls):

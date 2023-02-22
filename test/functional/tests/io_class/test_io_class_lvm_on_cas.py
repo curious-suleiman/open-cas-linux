@@ -44,6 +44,9 @@ def test_io_class_lvm_on_cas():
         core = cache.add_core(core_dev.partitions[0])
 
     with TestRun.step("Create LVM on CAS device."):
+        # backup the existing LVM config
+        backup_lvm_config = LvmConfiguration.backup_current_config()
+
         lvm_filters = ["a/.*/", "r|/dev/sd*|", "r|/dev/hd*|", "r|/dev/xvd*|", "r/disk/", "r/block/",
                        "r|/dev/nvme*|"]
 
@@ -54,7 +57,7 @@ def test_io_class_lvm_on_cas():
                                   cache_num=1,
                                   cas_dev_num=1)
 
-        lvms = Lvm.create_specific_lvm_configuration(core, config)
+        lvms, lvm_map = Lvm.create_specific_lvm_configuration(core, config)
         lvm = lvms[0]
 
     with TestRun.step("Create filesystem for LVM and mount it."):
@@ -125,6 +128,7 @@ def test_io_class_lvm_on_cas():
 
             fs_utils.remove(io_target)
 
-    with TestRun.step("Remove LVMs."):
+    with TestRun.step("Cleanup created LVMs and restore LVM config"):
         TestRun.executor.run(f"umount {mount_point}")
-        Lvm.remove_all()
+        Lvm.remove_specific_lvm_configuration(lvm_map)
+        LvmConfiguration.restore_config(backup_lvm_config)

@@ -37,6 +37,9 @@ def test_many_cores_on_many_lvms():
         core_dev = core_device.partitions[0]
 
     with TestRun.step("Create LVMs."):
+        # backup the existing LVM config
+        backup_lvm_config = LvmConfiguration.backup_current_config()
+
         config = LvmConfiguration(lvm_filters=[],
                                   pv_num=1,
                                   vg_num=1,
@@ -44,7 +47,7 @@ def test_many_cores_on_many_lvms():
                                   cache_num=1,
                                   cas_dev_num=16)
 
-        lvms = Lvm.create_specific_lvm_configuration([core_dev], config, lvm_as_core=True)
+        lvms, lvm_map = Lvm.create_specific_lvm_configuration([core_dev], config, lvm_as_core=True)
 
     with TestRun.step(f"Create CAS device."):
         cache = casadm.start_cache(cache_dev, force=True)
@@ -80,18 +83,18 @@ def test_many_cores_on_many_lvms():
         config_after_reboot, devices_after = get_test_configuration()
 
         if config_after_reboot == config_before_reboot:
-            TestRun.LOGGER.info(f"Configuration is as expected")
+            TestRun.LOGGER.info("Configuration is as expected")
         else:
             TestRun.LOGGER.info(f"config before reboot: {config_before_reboot}")
             TestRun.LOGGER.info(f"config after reboot: {config_after_reboot}")
-            TestRun.LOGGER.error(f"Configuration changed after reboot")
+            TestRun.LOGGER.error("Configuration changed after reboot")
 
         if devices_after == devices_before:
-            TestRun.LOGGER.info(f"Device list is as expected")
+            TestRun.LOGGER.info("Device list is as expected")
         else:
             TestRun.LOGGER.info(f"Devices before: {devices_before}")
             TestRun.LOGGER.info(f"Devices after: {devices_after}")
-            TestRun.LOGGER.error(f"Device list changed after reboot")
+            TestRun.LOGGER.error("Device list changed after reboot")
 
     with TestRun.step("Run FIO with verification on LVM."):
         fio_run.run()
@@ -100,12 +103,13 @@ def test_many_cores_on_many_lvms():
         casadm.remove_all_detached_cores()
         casadm.stop_all_caches()
 
-    with TestRun.step("Remove LVMs."):
-        Lvm.remove_all()
+    with TestRun.step("Cleanup created LVMs and restore LVM config"):
+        Lvm.remove_specific_lvm_configuration(lvm_map)
+        LvmConfiguration.restore_config(backup_lvm_config)
 
 
 def get_block_devices_list():
-    cmd = f"lsblk -l | awk '{{print $1}}' | grep -v loop"
+    cmd = "lsblk -l | awk '{{print $1}}' | grep -v loop"
     devices = TestRun.executor.run_expect_success(cmd).stdout
     devices_list = devices.splitlines()
     devices_list.sort()

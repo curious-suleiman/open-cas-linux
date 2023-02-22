@@ -49,6 +49,9 @@ def test_many_lvms_on_many_cores():
             cores.append(cache.add_core(core_dev))
 
     with TestRun.step("Create LVMs on CAS device."):
+        # backup the existing LVM config
+        backup_lvm_config = LvmConfiguration.backup_current_config()
+
         lvm_filters = ["a/.*/", "r|/dev/sd*|", "r|/dev/hd*|", "r|/dev/xvd*|", "r/disk/", "r/block/",
                        "r|/dev/nvme*|"]
 
@@ -59,7 +62,7 @@ def test_many_lvms_on_many_cores():
                                   cache_num=1,
                                   cas_dev_num=len(cores))
 
-        lvms = Lvm.create_specific_lvm_configuration(cores, config)
+        lvms, lvm_map = Lvm.create_specific_lvm_configuration(cores, config)
 
     with TestRun.step("Run FIO with verification on LVM."):
         fio_run = (Fio().create_command()
@@ -89,29 +92,29 @@ def test_many_lvms_on_many_cores():
         config_after_reboot, devices_after = get_test_configuration()
 
         if config_after_reboot == config_before_reboot:
-            TestRun.LOGGER.info(f"Configuration is as expected")
+            TestRun.LOGGER.info("Configuration is as expected")
         else:
             TestRun.LOGGER.info(f"config before reboot: {config_before_reboot}")
             TestRun.LOGGER.info(f"config after reboot: {config_after_reboot}")
-            TestRun.LOGGER.error(f"Configuration changed after reboot")
+            TestRun.LOGGER.error("Configuration changed after reboot")
 
         if devices_after == devices_before:
-            TestRun.LOGGER.info(f"Device list is as expected")
+            TestRun.LOGGER.info("Device list is as expected")
         else:
             TestRun.LOGGER.info(f"Devices before: {devices_before}")
             TestRun.LOGGER.info(f"Devices after: {devices_after}")
-            TestRun.LOGGER.error(f"Device list changed after reboot")
+            TestRun.LOGGER.error("Device list changed after reboot")
 
     with TestRun.step("Run FIO with verification on LVM."):
         fio_run.run()
 
-    with TestRun.step("Remove LVMs and clean up config changes."):
-        Lvm.remove_all()
-        LvmConfiguration.remove_filters_from_config()
+    with TestRun.step("Cleanup created LVMs and restore LVM config"):
+        Lvm.remove_specific_lvm_configuration(lvm_map)
+        LvmConfiguration.restore_config(backup_lvm_config)
 
 
 def get_block_devices_list():
-    cmd = f"lsblk -l | awk '{{print $1}}' | grep -v loop"
+    cmd = "lsblk -l | awk '{{print $1}}' | grep -v loop"
     devices = TestRun.executor.run_expect_success(cmd).stdout
     devices_list = devices.splitlines()
     devices_list.sort()
