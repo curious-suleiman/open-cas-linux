@@ -38,7 +38,7 @@ def test_many_cores_on_many_lvms():
 
     with TestRun.step("Create LVMs."):
         # backup the existing LVM config
-        backup_lvm_config = LvmConfiguration.backup_current_config()
+        TestRun.lvm_config_backup = LvmConfiguration.backup_current_config()
 
         config = LvmConfiguration(lvm_filters=[],
                                   pv_num=1,
@@ -47,7 +47,7 @@ def test_many_cores_on_many_lvms():
                                   cache_num=1,
                                   cas_dev_num=16)
 
-        lvms, lvm_map = Lvm.create_specific_lvm_configuration([core_dev], config, lvm_as_core=True)
+        lvms, TestRun.lvm_map = Lvm.create_specific_lvm_configuration([core_dev], config, lvm_as_core=True)
 
     with TestRun.step(f"Create CAS device."):
         cache = casadm.start_cache(cache_dev, force=True)
@@ -104,8 +104,10 @@ def test_many_cores_on_many_lvms():
         casadm.stop_all_caches()
 
     with TestRun.step("Cleanup created LVMs and restore LVM config"):
-        Lvm.remove_specific_lvm_configuration(lvm_map)
-        LvmConfiguration.restore_config(backup_lvm_config)
+        Lvm.remove_specific_lvm_configuration(TestRun.lvm_map)
+        TestRun.lvm_map = None
+        LvmConfiguration.restore_config(TestRun.lvm_config_backup)
+        TestRun.lvm_config_backup = None
 
 
 def get_block_devices_list():

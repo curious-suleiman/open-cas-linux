@@ -23,6 +23,15 @@ class TestRun:
     duts = None
     disks = None
 
+    # fields to store information about resources created during the test run that must be cleaned up
+    # at the conclusion of the test (regardless of exception, failure, etc)
+    # TODO: determine if this is the best way to store this info such that cleanup can reliably proceed
+    lvm_config_backup = None
+    lvm_map = None
+    device_mapper_list = None
+    error_device_list = None
+    # TODO: DRBD, RAID
+
     @classmethod
     @contextmanager
     def use_dut(cls, dut):

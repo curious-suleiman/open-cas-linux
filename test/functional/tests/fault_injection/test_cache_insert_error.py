@@ -209,6 +209,11 @@ def prepare_configuration(cache_mode, cache_line_size):
 
     with TestRun.step("Creating cache error device"):
         error_device = ErrorDevice("error", cache_device.partitions[0])
+        # Add the error device to the test run to ensure it is cleaned up properly in all cases
+        if TestRun.error_device_list is None:
+            TestRun.error_device_list = [error_device]
+        else:
+            TestRun.error_device_list.append(error_device)
 
     with TestRun.step("Starting cache to check metadata offset"):
         cache = casadm.start_cache(error_device, cache_line_size=cache_line_size, force=True)

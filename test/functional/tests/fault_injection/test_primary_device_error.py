@@ -132,6 +132,11 @@ def prepare_configuration(cache_mode, cache_line_size):
             error_zone_size=Size(5, Unit.Blocks512),
         ).fill_gaps(core1),
     )
+    # Add the error device to the test run to ensure it is cleaned up properly in all cases
+    if TestRun.error_device_list is None:
+        TestRun.error_device_list = [error_device]
+    else:
+        TestRun.error_device_list.append(error_device)
 
     cache = casadm.start_cache(
         cache_device.partitions[0],

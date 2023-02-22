@@ -40,7 +40,7 @@ def test_many_lvms_on_single_core():
 
     with TestRun.step("Create LVMs on CAS device."):
         # backup the existing LVM config
-        backup_lvm_config = LvmConfiguration.backup_current_config()
+        TestRun.lvm_config_backup = LvmConfiguration.backup_current_config()
 
         lvm_filters = ["a/.*/", "r|/dev/sd*|", "r|/dev/hd*|", "r|/dev/xvd*|", "r/disk/", "r/block/",
                        "r|/dev/nvme*|"]
@@ -52,7 +52,7 @@ def test_many_lvms_on_single_core():
                                   cache_num=1,
                                   cas_dev_num=1)
 
-        lvms, lvm_map = Lvm.create_specific_lvm_configuration(core, config)
+        lvms, TestRun.lvm_map = Lvm.create_specific_lvm_configuration(core, config)
 
     with TestRun.step("Run FIO with verification on LVM."):
         fio_run = (Fio().create_command()
@@ -99,8 +99,10 @@ def test_many_lvms_on_single_core():
         fio_run.run()
 
     with TestRun.step("Cleanup created LVMs and restore LVM config"):
-        Lvm.remove_specific_lvm_configuration(lvm_map)
-        LvmConfiguration.restore_config(backup_lvm_config)
+        Lvm.remove_specific_lvm_configuration(TestRun.lvm_map)
+        TestRun.lvm_map = None
+        LvmConfiguration.restore_config(TestRun.lvm_config_backup)
+        TestRun.lvm_config_backup = None
 
 
 def get_block_devices_list():

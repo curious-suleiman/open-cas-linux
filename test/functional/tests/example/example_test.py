@@ -281,15 +281,14 @@ def test_lvm_example():
         test_disk_2 = disk_2.partitions[0]
         test_disk_4 = disk_2.partitions[1]
 
-        # backup the existing LVM config
-        backup_lvm_config = LvmConfiguration.backup_current_config()
-
     with TestRun.step("Create LVMs"):
+        # backup the existing LVM config
+        TestRun.lvm_config_backup = LvmConfiguration.backup_current_config()
         # The LVM map is used later to determine which LVs/VGs/PVs were created specifically for this
         # test and thus can be safely removed
         # It is updated on each call to Lvm.create()
-        lvm1, lvm_map = Lvm.create(Size(5, Unit.GiB), [test_disk_1, test_disk_2], "lvm5")
-        lvm2, lvm_map = Lvm.create(70, [test_disk_3, test_disk_4], "lvm7", lvm_map=lvm_map)
+        lvm1, TestRun.lvm_map = Lvm.create(Size(5, Unit.GiB), [test_disk_1, test_disk_2], "lvm5")
+        lvm2, TestRun.lvm_map = Lvm.create(70, [test_disk_3, test_disk_4], "lvm7", lvm_map=TestRun.lvm_map)
 
     with TestRun.step("Discover LVMs"):
         lvms = Lvm.discover()
@@ -302,5 +301,7 @@ def test_lvm_example():
         TestRun.LOGGER.info("Created LVMs present in the system.")
     
     with TestRun.step("Cleanup created LVMs and restore LVM config"):
-        Lvm.remove_specific_lvm_configuration(lvm_map)
-        LvmConfiguration.restore_config(backup_lvm_config)
+        Lvm.remove_specific_lvm_configuration(TestRun.lvm_map)
+        TestRun.lvm_map = None
+        LvmConfiguration.restore_config(TestRun.lvm_config_backup)
+        TestRun.lvm_config_backup = None

@@ -187,7 +187,7 @@ class DmTable:
 
 class DeviceMapper(LinuxCommand):
     @classmethod
-    def remove_all(cls, force=True):
+    def _remove_all(cls, force=True):
         """Removes _all_ device mapper devices in the system.
 
         Note: DO NOT USE - if the currently running system relies on one or more DMs (for
@@ -303,12 +303,14 @@ class ErrorDevice(Device):
         return None
 
     def start(self):
-        self.mapper.create(self.table)
-        self.active = True
+        if not self.active:
+            self.mapper.create(self.table)
+            self.active = True
 
     def stop(self):
-        self.mapper.remove()
-        self.active = False
+        if self.active:
+            self.mapper.remove()
+            self.active = False
 
     def change_table(self, table: DmTable, permanent=True):
         if self.active:

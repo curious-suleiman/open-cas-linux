@@ -157,7 +157,29 @@ def pytest_runtest_teardown():
                 elif Drbd.is_installed():
                     Drbd.down_all()
 
-                DeviceMapper.remove_all()
+                # Ensure that any PVs/VGs/LVs created specifically for the TestRun are cleaned up
+                # Tests are able to do this cleanup themselves - if so, the below statements should
+                # have no effect
+                if TestRun.lvm_map is not None:
+                    Lvm.remove_specific_lvm_configuration(TestRun.lvm_map)
+                    TestRun.lvm_map = None
+                if TestRun.lvm_config_backup is not None:
+                    LvmConfiguration.restore_config(TestRun.lvm_config_backup)
+                    TestRun.lvm_config_backup = None
+
+                # [CSU] this blanket DM removal call has been disabled to avoid accidently removing existing root/swap devices
+                # Individual tests should use the methods provided by the DeviceMapper class to create and teardown DMs as
+                # required
+                # DeviceMapper.remove_all()
+                if TestRun.device_mapper_list is not None:
+                    for device in TestRun.device_mapper_list:
+                        device.remove()
+                    TestRun.device_mapper_list = None
+                if TestRun.error_device_list is not None:
+                    for error_device in TestRun.error_device_list:
+                        error_device.stop()
+                    TestRun.error_device_list = None
+
                 RamDisk.remove_all()
         except Exception as ex:
             TestRun.LOGGER.warning(f"Exception occurred during platform cleanup.\n"
@@ -231,8 +253,10 @@ def base_prepare(item):
         TestRun.executor.run("pkill --signal=SIGKILL fsck")
         Udev.enable()
         kill_all_io()
-        # [CSU] this call should be modified to not remove the root/swap devices
-        DeviceMapper.remove_all()
+        # [CSU] this blanket DM removal call has been disabled to avoid accidently removing existing root/swap devices
+        # Individual tests should use the methods provided by the DeviceMapper class to create and teardown DMs as
+        # required
+        # DeviceMapper.remove_all()
 
         if installer.check_if_installed():
             try:
