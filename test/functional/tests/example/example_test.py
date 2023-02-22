@@ -260,8 +260,8 @@ def test_example_emergency_escape():
     ), "Emergency Escape trigger marker found in dmesg"
 
 
-@pytest.mark.require_disk("cache1", DiskTypeSet([DiskType.hdd, DiskType.hdd4k, DiskType.sata]))
-@pytest.mark.require_disk("cache2", DiskTypeSet([DiskType.hdd, DiskType.hdd4k, DiskType.sata]))
+@pytest.mark.require_disk("cache1", DiskTypeSet([DiskType.hdd, DiskType.hdd4k, DiskType.sata, DiskType.nand]))
+@pytest.mark.require_disk("cache2", DiskTypeSet([DiskType.hdd, DiskType.hdd4k, DiskType.sata, DiskType.nand]))
 def test_lvm_example():
     """
         title: Example test using LVM API.

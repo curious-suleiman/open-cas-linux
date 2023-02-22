@@ -250,11 +250,13 @@ def base_prepare(item):
         if Drbd.is_installed():
             __drbd_cleanup()
 
-        lvms = Lvm.discover()
-        if lvms:
-            # [CSU] this call should be modified to not remove the root/swap LVs
-            Lvm.remove_all()
-            LvmConfiguration.remove_filters_from_config()
+        # [CSU] this blanket LVM removal call has been disabled to avoid accidently removing existing root/swap LVs
+        # Individual tests should use the methods provided by the Lvm class to create and teardown PVs/VGs/LVs as
+        # required
+        # lvms = Lvm.discover()
+        # if lvms:
+        #     Lvm.remove_all()
+        #     LvmConfiguration.remove_filters_from_config()
 
         raids = Raid.discover()
         for raid in raids:

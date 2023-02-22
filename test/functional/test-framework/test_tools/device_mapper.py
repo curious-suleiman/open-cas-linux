@@ -187,7 +187,7 @@ class DmTable:
 
 class DeviceMapper(LinuxCommand):
     @classmethod
-    def _remove_all(cls, force=True):
+    def remove_all(cls, force=True):
         """Removes _all_ device mapper devices in the system.
 
         Note: DO NOT USE - if the currently running system relies on one or more DMs (for

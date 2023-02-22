@@ -198,7 +198,7 @@ class LvmConfiguration:
         # return the name of the backup file for later restoration
         timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
         backup_file = f"{LVM_CONFIG_PATH}.bak.{timestamp}"
-        while not ospath.exists(backup_file):
+        while ospath.exists(backup_file):
             timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
             backup_file = f"{LVM_CONFIG_PATH}.bak.{timestamp}"
 
@@ -211,7 +211,7 @@ class LvmConfiguration:
     @staticmethod
     def restore_config(backup_file):
         TestRun.LOGGER.info(f"Restoring LVM config from {backup_file}...")
-        cmd = f"cp -p {backup_file} {LVM_CONFIG_PATH}"
+        cmd = f"cp -p {backup_file} {LVM_CONFIG_PATH} && rm -f {backup_file}"
         TestRun.executor.run(cmd)
 
 class VolumeGroup:
@@ -471,8 +471,8 @@ class Lvm(Disk):
             name = cls.__get_unique_lv_name()
 
         devices_paths = cls.get_devices_path(devices)
-        device_list = devices if isinstance(devices, list) else [devices]
-        dev_number = len(device_list)
+        device_path_list = devices_paths.split(" ") if isinstance(devices, list) else [devices_paths]
+        dev_number = len(device_path_list)
 
         if lvm_map is None:
             lvm_map = cls.discover_lvm_map()
@@ -496,16 +496,16 @@ class Lvm(Disk):
         lvm_map_vg['lvs'][lv.volume_name] = {
             'created': True
         }
-        for device in devices:
-            if device not in lvm_map['pvs']:
-                TestRun.LOGGER.info(f"Adding new PV {device} to LVM map")
-                lvm_map['pvs'][device] = {
+        for device_path in device_path_list:
+            if device_path not in lvm_map['pvs']:
+                TestRun.LOGGER.info(f"Adding new PV {device_path} to LVM map")
+                lvm_map['pvs'][device_path] = {
                     'created': True,
                     'vgs': []
                 }
-            if device not in lvm_map_vg['pvs']:
-                lvm_map_vg['pvs'].append(device)
-                lvm_map['pvs'][device]['vgs'].append(lv.volume_name)
+            if device_path not in lvm_map_vg['pvs']:
+                lvm_map_vg['pvs'].append(device_path)
+                lvm_map['pvs'][device_path]['vgs'].append(vg.name)
 
         return lv, lvm_map
 
@@ -547,7 +547,7 @@ class Lvm(Disk):
         return volumes
 
     @classmethod
-    def discover_lvm_map(cls):
+    def discover_lvm_map(cls) -> Dict:
         # Construct PV : VG : LV map for newly-created LVM elements
         # Note that if any of the given devices are not already configured as PVs,
         # they will automatically be configured as PVs during VG creation
@@ -580,37 +580,35 @@ class Lvm(Disk):
         }
 
         # first: discover existing VGs/PVs
-        # if any existing PV is found in 'devices', add it to the map with 'created' = false
-        # else, add it with 'created' = true
+        # if any existing PV is found, add it to the map with 'created' = false
         # for each PV added to the map, add any VGs currently linked to that PV to the map with
         # 'created' = false
-        # ignore any PV that is not found in 'devices'
         current_vgs = VolumeGroup.get_all_volume_groups()
-        provided_devices = devices if isinstance(devices, list) else [devices]
         for vg_name, associated_pvs in current_vgs.items():
             for associated_pv in associated_pvs:
-                if associated_pv in provided_devices:
-                    try:
-                        lvm_map_pv = lvm_map['pvs'][associated_pv]
-                    except KeyError:
-                        TestRun.LOGGER.info(f"Adding existing PV {associated_pv} to LVM map")
-                        lvm_map['pvs'][associated_pv] = lvm_map_pv = {
-                            'created': False,
-                            'vgs': {}
-                        }
-                    try:
-                        lvm_map_vg = lvm_map['vgs'][vg_name]
-                    except KeyError:
-                        TestRun.LOGGER.info(f"Adding existing VG {vg_name} to LVM map")
-                        lvm_map['vgs'][vg_name] = lvm_map_vg = {
-                            'created': False,
-                            'pvs': [],
-                            'lvs': {}
-                        }
+                try:
+                    lvm_map_pv = lvm_map['pvs'][associated_pv]
+                except KeyError:
+                    TestRun.LOGGER.info(f"Adding existing PV {associated_pv} to LVM map")
+                    lvm_map['pvs'][associated_pv] = lvm_map_pv = {
+                        'created': False,
+                        'vgs': {}
+                    }
+                try:
+                    lvm_map_vg = lvm_map['vgs'][vg_name]
+                except KeyError:
+                    TestRun.LOGGER.info(f"Adding existing VG {vg_name} to LVM map")
+                    lvm_map['vgs'][vg_name] = lvm_map_vg = {
+                        'created': False,
+                        'pvs': [],
+                        'lvs': {}
+                    }
 
-                    TestRun.LOGGER.info(f"Associating PV {associated_pv} with VG {vg_name} in LVM map")
-                    lvm_map_vg['pvs'].append(associated_pv)
-                    lvm_map_pv['vgs'].append(vg_name)
+                TestRun.LOGGER.info(f"Associating PV {associated_pv} with VG {vg_name} in LVM map")
+                lvm_map_vg['pvs'].append(associated_pv)
+                lvm_map_pv['vgs'].append(vg_name)
+
+        return lvm_map
 
     @classmethod
     def discover(cls):
