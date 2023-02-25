@@ -17,7 +17,7 @@ from tests.security.fuzzy.kernel.common.common import get_fuzz_config, prepare_c
     run_cmd_and_validate
 from tests.security.fuzzy.kernel.fuzzy_with_io.common.common import get_basic_workload
 
-mount_point = "/mnt/test"
+MOUNT_POINT = "/mnt/test"
 
 
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
@@ -43,11 +43,11 @@ def test_fuzzy_print_statistics_filter_core_io_class(cache_mode, cache_line_size
         core_disk = TestRun.disks['core']
         cache, core = prepare_cas_instance(cache_disk, core_disk, cache_mode, cache_line_size,
                                            KernelParameters(unaligned_io, use_io_scheduler),
-                                           cleaning_policy, mount_point=mount_point)
+                                           cleaning_policy, mount_point=MOUNT_POINT)
         casadm.load_io_classes(cache.cache_id, '/etc/opencas/ioclass-config.csv')
 
     with TestRun.step("Run fio in background"):
-        fio = get_basic_workload(mount_point)
+        fio = get_basic_workload(MOUNT_POINT)
         fio_pid = fio.run_in_background()
 
     with TestRun.step("Prepare PeachFuzzer"):
