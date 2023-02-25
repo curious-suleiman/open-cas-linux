@@ -57,7 +57,7 @@ def test_interrupt_core_flush(cache_mode, filesystem):
             core = cache.add_core(core_part)
             core.mount(mount_point)
 
-        with TestRun.step(f"Create test file in mount point of exported object."):
+        with TestRun.step("Create test file in mount point of exported object."):
             test_file = create_test_file()
 
         with TestRun.step("Check md5 sum of test file."):
@@ -141,7 +141,7 @@ def test_interrupt_cache_flush(cache_mode, filesystem):
             core = cache.add_core(core_part)
             core.mount(mount_point)
 
-        with TestRun.step(f"Create test file in mount point of exported object."):
+        with TestRun.step("Create test file in mount point of exported object."):
             test_file = create_test_file()
 
         with TestRun.step("Check md5 sum of test file."):
@@ -229,7 +229,7 @@ def test_interrupt_core_remove(cache_mode, filesystem):
             core = cache.add_core(core_part)
             core.mount(mount_point)
 
-        with TestRun.step(f"Create test file in mount point of exported object."):
+        with TestRun.step("Create test file in mount point of exported object."):
             test_file = create_test_file()
 
         with TestRun.step("Check md5 sum of test file."):
@@ -327,10 +327,10 @@ def test_interrupt_cache_mode_switch_parametrized(cache_mode, stop_percentage):
         with TestRun.step("Set cleaning policy to NOP."):
             cache.set_cleaning_policy(CleaningPolicy.nop)
 
-        with TestRun.step(f"Add core device."):
+        with TestRun.step("Add core device."):
             core = cache.add_core(core_part)
 
-        with TestRun.step(f"Create test file in mount point of exported object."):
+        with TestRun.step("Create test file in mount point of exported object."):
             test_file_size = Size(1024, Unit.MebiByte)
             test_file = fs_utils.create_random_test_file(test_file_path, test_file_size)
 
@@ -422,7 +422,7 @@ def test_interrupt_cache_stop(cache_mode, filesystem):
             core = cache.add_core(core_part)
             core.mount(mount_point)
 
-        with TestRun.step(f"Create test file in mount point of exported object."):
+        with TestRun.step("Create test file in mount point of exported object."):
             test_file = create_test_file()
 
         with TestRun.step("Get number of dirty data on exported object before interruption."):
