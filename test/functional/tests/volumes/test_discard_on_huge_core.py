@@ -28,7 +28,7 @@ def test_discard_on_huge_core():
           - There is no RCU-sched type stall in dmesg log.
     """
     with TestRun.step("Clear dmesg log."):
-        TestRun.executor.run_expect_success(f"dmesg -c")
+        TestRun.executor.run_expect_success("dmesg -c")
 
     with TestRun.step("Prepare devices for cache and core."):
         cache_dev = TestRun.disks['cache']
@@ -51,7 +51,7 @@ def test_discard_on_huge_core():
 
 
 def check_for_rcu_sched_type_stall():
-    output = TestRun.executor.run_expect_success(f"dmesg")
+    output = TestRun.executor.run_expect_success("dmesg")
     rcu_sched_found = False
     dmesg_log_id = ""
 

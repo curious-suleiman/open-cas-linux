@@ -63,6 +63,8 @@ def test_many_lvms_on_many_cores():
                                   cas_dev_num=len(cores))
 
         lvms, TestRun.lvm_map = Lvm.create_specific_lvm_configuration(cores, config)
+        if lvms is None:
+            TestRun.fail("Could not create target LVM configuration for test, cannot continue")
 
     with TestRun.step("Run FIO with verification on LVM."):
         fio_run = (Fio().create_command()
@@ -82,31 +84,33 @@ def test_many_lvms_on_many_cores():
         for lvm in lvms:
             TestRun.executor.run_expect_success(f"hdparm -f {lvm.path}")
 
-    with TestRun.step("Create init config from running configuration"):
-        config_before_reboot, devices_before = get_test_configuration()
+    # Only run reboot/config persistence phase if the executor supports remote operations
+    if TestRun.executor.is_remote():
+        with TestRun.step("Create init config from running configuration"):
+            config_before_reboot, devices_before = get_test_configuration()
 
-    with TestRun.step("Reboot system."):
-        TestRun.executor.reboot()
+        with TestRun.step("Reboot system."):
+            TestRun.executor.reboot()
 
-    with TestRun.step("Validate running configuration"):
-        config_after_reboot, devices_after = get_test_configuration()
+        with TestRun.step("Validate running configuration"):
+            config_after_reboot, devices_after = get_test_configuration()
 
-        if config_after_reboot == config_before_reboot:
-            TestRun.LOGGER.info("Configuration is as expected")
-        else:
-            TestRun.LOGGER.info(f"config before reboot: {config_before_reboot}")
-            TestRun.LOGGER.info(f"config after reboot: {config_after_reboot}")
-            TestRun.LOGGER.error("Configuration changed after reboot")
+            if config_after_reboot == config_before_reboot:
+                TestRun.LOGGER.info("Configuration is as expected")
+            else:
+                TestRun.LOGGER.info(f"config before reboot: {config_before_reboot}")
+                TestRun.LOGGER.info(f"config after reboot: {config_after_reboot}")
+                TestRun.LOGGER.error("Configuration changed after reboot")
 
-        if devices_after == devices_before:
-            TestRun.LOGGER.info("Device list is as expected")
-        else:
-            TestRun.LOGGER.info(f"Devices before: {devices_before}")
-            TestRun.LOGGER.info(f"Devices after: {devices_after}")
-            TestRun.LOGGER.error("Device list changed after reboot")
+            if devices_after == devices_before:
+                TestRun.LOGGER.info("Device list is as expected")
+            else:
+                TestRun.LOGGER.info(f"Devices before: {devices_before}")
+                TestRun.LOGGER.info(f"Devices after: {devices_after}")
+                TestRun.LOGGER.error("Device list changed after reboot")
 
-    with TestRun.step("Run FIO with verification on LVM."):
-        fio_run.run()
+        with TestRun.step("Run FIO with verification on LVM."):
+            fio_run.run()
 
     with TestRun.step("Cleanup created LVMs and restore LVM config"):
         Lvm.remove_specific_lvm_configuration(TestRun.lvm_map)

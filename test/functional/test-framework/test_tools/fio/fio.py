@@ -14,8 +14,26 @@ from test_utils import os_utils
 
 
 class Fio:
+
+    @property
+    def fio_path(self):
+        if self._fio_path is not None:
+            return self._fio_path
+        # need to determine the correct path to the fio binary before constructing the command
+        # the is_installed()/install() calls below will set self._fio_path to the actual
+        # fio binary path
+        if not self.is_installed():
+            self.install()
+        return self._fio_path
+    
+    @fio_path.setter
+    def fio_path(self, value):
+        # do not allow external callers to change this property value
+        # TODO: more specific exception
+        raise Exception('Read only property: fio_path')
+
     def __init__(self, executor_obj=None):
-        self.fio_path = None    # this will be set later
+        self._fio_path = None    # _fio_path is the 'private' attribute for the fio_path property
         self.fio_version = "fio-3.30"
         self.default_run_time = datetime.timedelta(hours=1)
         self.jobs = []
@@ -42,7 +60,7 @@ class Fio:
         # [CSU] When running the tests using sudo (as they will not work with regular permissions
         # due to the need to e.g. create devices, mount/unmount devices, etc) the below check
         # is not consistent with the result of calling install(). This is due to the following:
-        #   - install() downloads the fio snap to /tmp, unpacks, then runs configures/make/make install
+        #   - install() downloads the fio snap to /tmp, unpacks, then runs configure/make/make install
         #     on the unpacked snap
         #   - this installs fio into /usr/local/bin (as expected)
         #   - /usr/local/bin is not included in the binary search path when running 'sudo pytest ...'
@@ -72,20 +90,20 @@ class Fio:
         #   - if install() finds fio explicitly, then the command_name provided to FioParamCmd
         #     should be /usr/local/bin/fio
         
-        # if self.fio_path is already set, then this check has already been performed at least once
+        # if self._fio_path is already set, then this check has already been performed at least once
         # check whether it is still accurate
-        if self.fio_path is not None and \
-            self.executor.run(f"{self.fio_path} --version").stdout.strip() == self.fio_version:
+        if self._fio_path is not None and \
+            self.executor.run(f"{self._fio_path} --version").stdout.strip() == self.fio_version:
             return True
 
         # check whether it is available explicitly at /usr/local/bin/fio
         if self.executor.run("/usr/local/bin/fio --version").stdout.strip() == self.fio_version:
-            self.fio_path = '/usr/local/bin/fio'
+            self._fio_path = '/usr/local/bin/fio'
             return True
 
         # check whether it is available on the prevailing binary search path
         if self.executor.run("fio --version").stdout.strip() == self.fio_version:
-            self.fio_path = 'fio'
+            self._fio_path = 'fio'
             return True
         
         return False
@@ -98,7 +116,7 @@ class Fio:
                                             f" && ./configure && make -j && make install")
         # [CSU] refer notes in is_installed() above
         # confirm that fio was installed correctly at the expected location
-        self.fio_path = '/usr/local/bin/fio'
+        self._fio_path = '/usr/local/bin/fio'
         if not self.is_installed():
             TestRun.LOGGER.error('Failed to confirm the installed fio binary at /usr/local/bin/fio after installation, cannot continue')
             # TODO: more specific exception

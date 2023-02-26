@@ -9,14 +9,14 @@ from api.cas.init_config import InitConfig, opencas_conf_path
 from storage_devices.lvm import Lvm, LvmConfiguration
 from api.cas import casadm
 from core.test_run import TestRun
-from storage_devices.disk import DiskType, DiskTypeSet
+from storage_devices.disk import DiskType, DiskTypeSet, DiskTypeLowerThan
 from test_tools.fio.fio import Fio
 from test_tools.fio.fio_param import ReadWrite, IoEngine, VerifyMethod
 from test_utils.size import Size, Unit
 
-
+# [CSU] Modified to allow non-SSD to be used for core device
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
-@pytest.mark.require_disk("core", DiskTypeSet([DiskType.optane, DiskType.nand]))
+@pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 def test_many_cores_on_many_lvms():
     """
         title: Test for CAS creation with lvms as cores: 1 cache, 16 lvms, 16 cores.
@@ -28,7 +28,7 @@ def test_many_cores_on_many_lvms():
           - FIO with verification ran successfully.
           - Configuration after reboot match configuration before.
     """
-    with TestRun.step(f"Prepare devices."):
+    with TestRun.step("Prepare devices."):
         cache_device = TestRun.disks['cache']
         core_device = TestRun.disks['core']
         cache_device.create_partitions([Size(1, Unit.GibiByte)])
@@ -48,8 +48,10 @@ def test_many_cores_on_many_lvms():
                                   cas_dev_num=16)
 
         lvms, TestRun.lvm_map = Lvm.create_specific_lvm_configuration([core_dev], config, lvm_as_core=True)
+        if lvms is None:
+            TestRun.fail("Could not create target LVM configuration for test, cannot continue")
 
-    with TestRun.step(f"Create CAS device."):
+    with TestRun.step("Create CAS device."):
         cache = casadm.start_cache(cache_dev, force=True)
         cores = []
         for lvm in lvms:
@@ -73,31 +75,33 @@ def test_many_cores_on_many_lvms():
         for core in cores:
             TestRun.executor.run_expect_success(f"hdparm -f {core.path}")
 
-    with TestRun.step("Create init config from running configuration"):
-        config_before_reboot, devices_before = get_test_configuration()
+    # Only run reboot/config persistence phase if the executor supports remote operations
+    if TestRun.executor.is_remote():
+        with TestRun.step("Create init config from running configuration"):
+            config_before_reboot, devices_before = get_test_configuration()
 
-    with TestRun.step("Reboot system."):
-        TestRun.executor.reboot()
+        with TestRun.step("Reboot system."):
+            TestRun.executor.reboot()
 
-    with TestRun.step("Validate running configuration"):
-        config_after_reboot, devices_after = get_test_configuration()
+        with TestRun.step("Validate running configuration"):
+            config_after_reboot, devices_after = get_test_configuration()
 
-        if config_after_reboot == config_before_reboot:
-            TestRun.LOGGER.info("Configuration is as expected")
-        else:
-            TestRun.LOGGER.info(f"config before reboot: {config_before_reboot}")
-            TestRun.LOGGER.info(f"config after reboot: {config_after_reboot}")
-            TestRun.LOGGER.error("Configuration changed after reboot")
+            if config_after_reboot == config_before_reboot:
+                TestRun.LOGGER.info("Configuration is as expected")
+            else:
+                TestRun.LOGGER.info(f"config before reboot: {config_before_reboot}")
+                TestRun.LOGGER.info(f"config after reboot: {config_after_reboot}")
+                TestRun.LOGGER.error("Configuration changed after reboot")
 
-        if devices_after == devices_before:
-            TestRun.LOGGER.info("Device list is as expected")
-        else:
-            TestRun.LOGGER.info(f"Devices before: {devices_before}")
-            TestRun.LOGGER.info(f"Devices after: {devices_after}")
-            TestRun.LOGGER.error("Device list changed after reboot")
+            if devices_after == devices_before:
+                TestRun.LOGGER.info("Device list is as expected")
+            else:
+                TestRun.LOGGER.info(f"Devices before: {devices_before}")
+                TestRun.LOGGER.info(f"Devices after: {devices_after}")
+                TestRun.LOGGER.error("Device list changed after reboot")
 
-    with TestRun.step("Run FIO with verification on LVM."):
-        fio_run.run()
+        with TestRun.step("Run FIO with verification on LVM."):
+            fio_run.run()
 
     with TestRun.step("Remove CAS devices."):
         casadm.remove_all_detached_cores()

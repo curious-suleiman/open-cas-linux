@@ -443,6 +443,12 @@ class Lvm(Disk):
 
             for _ in range(lv_per_vg):
                 lv, lvm_map = cls.create(lv_size_percentage, pv_devs, lvm_map=lvm_map)
+                if lv is None: # LV failed to create
+                    # return an up-to-date lvm_map so that the caller knows which devices
+                    # were newly created as part of this LV creation call
+                    # this allows correct teardown to continue even if the desired
+                    # LVM configuration was only partially created
+                    return None, lvm_map
                 created_lvs.append(lv)
 
             if lvm_as_core:
@@ -489,7 +495,15 @@ class Lvm(Disk):
                 'lvs': {}
             }
 
-        lv = cls.__create(name, size_cmd, vg)
+        # wrap the LV creation call so that if it fails this method can return
+        # a result that signals to the caller that there was a failure, as well as
+        # an up-to-date lvm_map so that the caller knows which devices were newly
+        # created as part of this LV creation call
+        try:
+            lv = cls.__create(name, size_cmd, vg)
+        except Exception as creation_exception: # TODO: more specific exception
+            TestRun.LOGGER.error(f'Failed to create LV with name {name}: {creation_exception}')
+            return None, lvm_map
         
         # insert the new LV into the lvm_map
         TestRun.LOGGER.info(f"Adding new LV {lv.volume_name} to LVM map")

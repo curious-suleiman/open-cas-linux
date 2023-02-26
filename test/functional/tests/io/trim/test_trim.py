@@ -107,7 +107,7 @@ def test_trim_propagation():
       - No data corruption after power failure.
     """
 
-    with TestRun.step(f"Create partitions"):
+    with TestRun.step("Create partitions"):
         TestRun.disks["ssd1"].create_partitions([Size(43, Unit.MegaByte)])
         TestRun.disks["ssd2"].create_partitions([Size(512, Unit.KiloByte)])
 
@@ -119,17 +119,17 @@ def test_trim_propagation():
         if not check_if_device_supports_trim(core_dev):
             raise Exception("Core device doesn't support discards")
 
-    with TestRun.step(f"Disable udev"):
+    with TestRun.step("Disable udev"):
         os_utils.Udev.disable()
 
-    with TestRun.step(f"Prepare cache instance in WB with one core"):
+    with TestRun.step("Prepare cache instance in WB with one core"):
         cache = casadm.start_cache(cache_dev, CacheMode.WB, force=True)
         core = cache.add_core(core_dev)
         cache.set_cleaning_policy(CleaningPolicy.nop)
         cache.set_seq_cutoff_policy(SeqCutOffPolicy.never)
         cache.purge_cache()
 
-    with TestRun.step(f"Fill exported object with dirty data"):
+    with TestRun.step("Fill exported object with dirty data"):
         core_size_4k = core.get_statistics().config_stats.core_size.get_value(Unit.Blocks4096)
         core_size_4k = int(core_size_4k)
 
@@ -145,7 +145,7 @@ def test_trim_propagation():
                 f"actual value {dirty_4k}"
             )
 
-    with TestRun.step(f"Discard 4k of data on exported object"):
+    with TestRun.step("Discard 4k of data on exported object"):
         TestRun.executor.run_expect_success(f"blkdiscard {core.path} --length 4096 --offset 0")
         old_occupancy = cache.get_statistics().usage_stats.occupancy.get_value(Unit.Blocks4096)
 

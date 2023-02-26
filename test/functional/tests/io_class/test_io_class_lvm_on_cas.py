@@ -58,6 +58,8 @@ def test_io_class_lvm_on_cas():
                                   cas_dev_num=1)
 
         lvms, TestRun.lvm_map = Lvm.create_specific_lvm_configuration(core, config)
+        if lvms is None:
+            TestRun.fail("Could not create target LVM configuration for test, cannot continue")
         lvm = lvms[0]
 
     with TestRun.step("Create filesystem for LVM and mount it."):
