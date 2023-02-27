@@ -6,20 +6,16 @@
 import re
 from datetime import timedelta
 
-import paramiko
-
 from core.test_run import TestRun
 from test_utils.os_utils import wait
 
 
 def check_progress_bar(command: str, progress_bar_expected: bool = True):
     TestRun.LOGGER.info(f"Check progress for command: {command}")
-    try:
-        stdin, stdout, stderr = TestRun.executor.ssh.exec_command(command, get_pty=True)
-    except paramiko.SSHException as e:
-        raise ConnectionError(f"An exception occurred while executing command: {command}\n{e}")
+    
+    stdout, _ = TestRun.executor.exec_command(command)
 
-    if not wait(lambda: stdout.channel.recv_ready(), timedelta(seconds=10), timedelta(seconds=1)):
+    if not wait(lambda: stdout.ready(), timedelta(seconds=10), timedelta(seconds=1)):
         if not progress_bar_expected:
             TestRun.LOGGER.info("Progress bar did not appear when output was redirected to a file.")
             return
@@ -31,7 +27,7 @@ def check_progress_bar(command: str, progress_bar_expected: bool = True):
 
     percentage = 0
     while True:
-        output = stdout.channel.recv(1024).decode('utf-8')
+        output = stdout.read(1024).decode('utf-8')
         search = re.search(r'\d+.\d+', output)
         last_percentage = percentage
         if search:
@@ -43,8 +39,8 @@ def check_progress_bar(command: str, progress_bar_expected: bool = True):
                 TestRun.fail(f"Progress must be greater than 0%. Actual: {percentage}%.")
             elif percentage > 100:
                 TestRun.fail(f"Progress cannot be greater than 100%. Actual: {percentage}%.")
-        elif (stdout.channel.exit_status_ready() or not output) and last_percentage > 0:
+        elif (stdout.closed() or not output) and last_percentage > 0:
             TestRun.LOGGER.info("Progress complete.")
             break
-        elif stdout.channel.exit_status_ready() and last_percentage == 0:
+        elif stdout.closed() and last_percentage == 0:
             TestRun.fail("Process has exited but progress doesn't complete.")

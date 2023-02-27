@@ -22,7 +22,7 @@ step = int(Size(512, Unit.Byte))
 stop_size = int(Size(128, Unit.KibiByte))
 runtime = datetime.timedelta(hours=12) / (stop_size / 512)
 
-
+@pytest.skip("12-hour duration - only activate when required")
 @pytest.mark.os_dependent
 @pytest.mark.parametrize("cache_mode", [CacheMode.WT, CacheMode.WB])
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))

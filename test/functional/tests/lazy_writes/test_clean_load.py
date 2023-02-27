@@ -14,6 +14,7 @@ from test_utils.os_utils import Udev
 from test_utils.size import Size, Unit
 
 
+@pytest.mark.remote_only  # reboot not supported by local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 def test_clean_load():

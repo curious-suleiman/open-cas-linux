@@ -30,6 +30,7 @@ other_pattern = "0x0000"
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 @pytest.mark.parametrizex("cache_mode", CacheMode.with_traits(CacheModeTrait.LazyWrites))

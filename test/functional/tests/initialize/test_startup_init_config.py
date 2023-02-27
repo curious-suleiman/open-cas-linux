@@ -41,6 +41,7 @@ def test_cas_startup(cache_mode, filesystem):
       - Cache is loaded before partitions are mounted.
       - Exported object is mounted after startup is complete.
     """
+
     with TestRun.step("Prepare partitions for cache (200MiB) and for core (400MiB)"):
         cache_dev = TestRun.disks['cache']
         cache_dev.create_partitions([Size(200, Unit.MebiByte)])
@@ -156,6 +157,7 @@ def test_cas_init_with_changed_mode(cache_mode_pair):
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # power cycling not supported when running on local host
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd]))
 @pytest.mark.require_plugin("power_control")
@@ -174,7 +176,7 @@ def test_cas_startup_lazy():
         cache_disk.create_partitions([Size(200, Unit.MebiByte)] * 2)
         core_disk.create_partitions([Size(200, Unit.MebiByte)] * 4)
 
-    with TestRun.step(f"Add a cache configuration with cache device with `lazy_startup` flag"):
+    with TestRun.step("Add a cache configuration with cache device with `lazy_startup` flag"):
         init_conf = InitConfig()
         init_conf.add_cache(1, cache_disk.partitions[0], extra_flags="lazy_startup=True")
         init_conf.add_core(1, 1, core_disk.partitions[0])
@@ -182,7 +184,7 @@ def test_cas_startup_lazy():
 
         expected_core_pool_paths = set(c.path for c in core_disk.partitions[:2])
 
-    with TestRun.step(f"Add a cache configuration with core device with `lazy_startup` flag"):
+    with TestRun.step("Add a cache configuration with core device with `lazy_startup` flag"):
         init_conf.add_cache(2, cache_disk.partitions[1])
         init_conf.add_core(2, 1, core_disk.partitions[2])
         init_conf.add_core(2, 2, core_disk.partitions[3], extra_flags="lazy_startup=True")
@@ -194,7 +196,7 @@ def test_cas_startup_lazy():
         active_core_path = core_disk.partitions[2].path
         inactive_core_path = core_disk.partitions[3].path
 
-    with TestRun.step(f"Start and stop all the configurations using the casctl utility"):
+    with TestRun.step("Start and stop all the configurations using the casctl utility"):
         output = casctl.init(True)
         if output.exit_code != 0:
             TestRun.fail(f"Failed to initialize caches from config file. Error: {output.stdout}")
@@ -205,7 +207,7 @@ def test_cas_startup_lazy():
     ):
         Udev.disable()
 
-    with TestRun.step(f"Remove one cache patition and one core partition"):
+    with TestRun.step("Remove one cache patition and one core partition"):
         cache_disk.remove_partition(cache_disk.partitions[0])
         core_disk.remove_partition(core_disk.partitions[3])
 
@@ -261,6 +263,7 @@ def test_cas_startup_lazy():
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # reboot not supported by local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd]))
 def test_cas_startup_negative_missing_core():
@@ -277,20 +280,20 @@ def test_cas_startup_negative_missing_core():
         cache_disk.create_partitions([Size(200, Unit.MebiByte)] * 2)
         core_disk.create_partitions([Size(200, Unit.MebiByte)] * 4)
 
-    with TestRun.step(f"Add a cache configuration with cache device with `lazy_startup` flag"):
+    with TestRun.step("Add a cache configuration with cache device with `lazy_startup` flag"):
         init_conf = InitConfig()
         init_conf.add_cache(1, cache_disk.partitions[0], extra_flags="lazy_startup=True")
         init_conf.add_core(1, 1, core_disk.partitions[0])
         init_conf.add_core(1, 2, core_disk.partitions[1])
 
-    with TestRun.step(f"Add a cache configuration with core device with `lazy_startup` flag"):
+    with TestRun.step("Add a cache configuration with core device with `lazy_startup` flag"):
         init_conf.add_cache(2, cache_disk.partitions[1])
         init_conf.add_core(2, 1, core_disk.partitions[2])
         init_conf.add_core(2, 2, core_disk.partitions[3], extra_flags="lazy_startup=True")
         init_conf.save_config_file()
         sync()
 
-    with TestRun.step(f"Start and stop all the configurations using the casctl utility"):
+    with TestRun.step("Start and stop all the configurations using the casctl utility"):
         output = casctl.init(True)
         if output.exit_code != 0:
             TestRun.fail(f"Failed to initialize caches from config file. Error: {output.stdout}")
@@ -301,7 +304,7 @@ def test_cas_startup_negative_missing_core():
     ):
         Udev.disable()
 
-    with TestRun.step(f"Remove core partition"):
+    with TestRun.step("Remove core partition"):
         core_disk.remove_partition(core_disk.partitions[0])
 
     escape = EmergencyEscape()
@@ -323,6 +326,7 @@ def test_cas_startup_negative_missing_core():
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # reboot not supported by local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd]))
 def test_cas_startup_negative_missing_cache():
@@ -339,20 +343,20 @@ def test_cas_startup_negative_missing_cache():
         cache_disk.create_partitions([Size(200, Unit.MebiByte)] * 2)
         core_disk.create_partitions([Size(200, Unit.MebiByte)] * 4)
 
-    with TestRun.step(f"Add a cache configuration with cache device with `lazy_startup` flag"):
+    with TestRun.step("Add a cache configuration with cache device with `lazy_startup` flag"):
         init_conf = InitConfig()
         init_conf.add_cache(1, cache_disk.partitions[0], extra_flags="lazy_startup=True")
         init_conf.add_core(1, 1, core_disk.partitions[0])
         init_conf.add_core(1, 2, core_disk.partitions[1])
 
-    with TestRun.step(f"Add a cache configuration with core devices with `lazy_startup` flag"):
+    with TestRun.step("Add a cache configuration with core devices with `lazy_startup` flag"):
         init_conf.add_cache(2, cache_disk.partitions[1])
         init_conf.add_core(2, 1, core_disk.partitions[2], extra_flags="lazy_startup=True")
         init_conf.add_core(2, 2, core_disk.partitions[3], extra_flags="lazy_startup=True")
         init_conf.save_config_file()
         sync()
 
-    with TestRun.step(f"Start and stop all the configurations using the casctl utility"):
+    with TestRun.step("Start and stop all the configurations using the casctl utility"):
         output = casctl.init(True)
         if output.exit_code != 0:
             TestRun.fail(f"Failed to initialize caches from config file. Error: {output.stdout}")
@@ -363,7 +367,7 @@ def test_cas_startup_negative_missing_cache():
     ):
         Udev.disable()
 
-    with TestRun.step(f"Remove second cache partition"):
+    with TestRun.step("Remove second cache partition"):
         cache_disk.remove_partition(cache_disk.partitions[1])
 
     escape = EmergencyEscape()
@@ -385,6 +389,7 @@ def test_cas_startup_negative_missing_cache():
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # power-cycling not supported on local host
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeSet([DiskType.hdd]))
 @pytest.mark.require_plugin("power_control")
@@ -405,7 +410,7 @@ def test_failover_config_startup():
         core_disk.create_partitions([Size(200, Unit.MebiByte)])
 
     with TestRun.step(
-        f"Add a cache configuration with cache device with "
+        "Add a cache configuration with cache device with "
         "`target_failover_state=active` flag and a core"
     ):
         init_conf = InitConfig()
@@ -417,7 +422,7 @@ def test_failover_config_startup():
         active_core_path = core_disk.partitions[0].path
 
     with TestRun.step(
-        f"Add a cache configuration with cache device with "
+        "Add a cache configuration with cache device with "
         "`target_failover_state=failover` flag"
     ):
         init_conf.add_cache(
@@ -429,7 +434,7 @@ def test_failover_config_startup():
         init_conf.save_config_file()
         sync()
 
-    with TestRun.step(f"Start and stop all the configurations using the casctl utility"):
+    with TestRun.step("Start and stop all the configurations using the casctl utility"):
         output = casctl.init(True)
         if output.exit_code != 0:
             TestRun.fail(f"Failed to initialize caches from config file. Error: {output.stdout}")
@@ -490,6 +495,7 @@ def test_failover_config_startup():
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # reboot not supported by local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 def test_failover_config_startup_negative():
     """
@@ -505,7 +511,7 @@ def test_failover_config_startup_negative():
         cache_disk = TestRun.disks["cache"]
         cache_disk.create_partitions([Size(200, Unit.MebiByte)])
 
-    with TestRun.step(f"Add a cache configuration with standby cache"):
+    with TestRun.step("Add a cache configuration with standby cache"):
         init_conf = InitConfig()
         init_conf.add_cache(
             1,
@@ -515,7 +521,7 @@ def test_failover_config_startup_negative():
         init_conf.save_config_file()
         sync()
 
-    with TestRun.step(f"Start and stop all the configurations using the casctl utility"):
+    with TestRun.step("Start and stop all the configurations using the casctl utility"):
         output = casctl.init(True)
         if output.exit_code != 0:
             TestRun.fail(f"Failed to initialize caches from config file. Error: {output.stdout}")
@@ -526,7 +532,7 @@ def test_failover_config_startup_negative():
     ):
         Udev.disable()
 
-    with TestRun.step(f"Remove second cache partition"):
+    with TestRun.step("Remove second cache partition"):
         cache_disk.remove_partition(cache_disk.partitions[0])
 
     escape = EmergencyEscape()

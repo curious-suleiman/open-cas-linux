@@ -91,6 +91,7 @@ def test_trim_start_discard():
         cache.stop()
 
 
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("ssd1", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("ssd2", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_plugin("power_control")

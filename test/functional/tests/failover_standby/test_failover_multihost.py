@@ -42,6 +42,7 @@ mountpoint = "/tmp/drbd_functional_test"
 test_file_path = f"{mountpoint}/test_file"
 
 
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("metadata_dev", DiskTypeSet([DiskType.nand]))
 @pytest.mark.require_disk("core_dev", DiskTypeSet([DiskType.hdd]))
 @pytest.mark.require_disk("raid_dev1", DiskTypeSet([DiskType.optane]))
@@ -226,6 +227,7 @@ def test_functional_activate_twice_round_trip(filesystem):
     TestRun.LOGGER.end_group()
 
 
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("metadata_dev", DiskTypeSet([DiskType.nand]))
 @pytest.mark.require_disk("core_dev", DiskTypeSet([DiskType.hdd]))
 @pytest.mark.require_disk("raid_dev1", DiskTypeSet([DiskType.optane]))
@@ -489,14 +491,14 @@ def failover_sequence(standby_node, drbd_resource, filesystem, core):
         TestRun.executor.run_expect_success(f"ls -la /dev/ | grep cas{cache_id}-1")
 
     if filesystem:
-        with TestRun.use_dut(standby_node), TestRun.step(f"Mount core"):
+        with TestRun.use_dut(standby_node), TestRun.step("Mount core"):
             TestRun.executor.run(f"rm -rf {mountpoint}")
             fs_utils.create_directory(path=mountpoint)
             core.mount(mountpoint)
 
 
 def postfailover_check(new_primary_node, data_path, core_md5, cache_stats):
-    with TestRun.use_dut(new_primary_node), TestRun.step(f"Make sure the usage stats are correct"):
+    with TestRun.use_dut(new_primary_node), TestRun.step("Make sure the usage stats are correct"):
         failover_cache_stats = new_primary_node.cache.get_statistics().usage_stats
         if cache_stats.dirty != failover_cache_stats.dirty:
             TestRun.LOGGER.error(

@@ -21,6 +21,7 @@ mount_point = "/mnt/test"
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # reboot and power-cycling not supported on local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 @pytest.mark.parametrizex("cache_mode", CacheMode)
@@ -35,6 +36,7 @@ def test_load_after_clean_shutdown(reboot_type, cache_mode, filesystem):
           - DUT should reboot successfully.
           - Checksum of file on core device should be the same before and after reboot.
     """
+
     with TestRun.step("Prepare CAS device."):
         cache_disk = TestRun.disks['cache']
         cache_disk.create_partitions([Size(1, Unit.GibiByte)])

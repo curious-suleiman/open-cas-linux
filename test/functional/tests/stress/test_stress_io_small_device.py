@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
-import pytest
 from datetime import timedelta
+
+import pytest
 
 from api.cas import casadm, casadm_parser
 from api.cas.cache_config import CacheLineSize, CacheMode, CleaningPolicy
@@ -14,9 +15,13 @@ from test_tools.fio.fio import Fio
 from test_tools.fio.fio_param import CpusAllowedPolicy, IoEngine, ReadWrite
 from test_utils.size import Size, Unit
 
+# test_stress_small_cas_device has 90 parametric test cases, and each
+# test case will take at least stress_time to complete
+# for example, if stress_time is set to 30m, this test will take
+# approx 2 days to complete all the parametric test cases
 stress_time = timedelta(minutes=30)
 
-
+@pytest.skip("Long-running test - only run when required, check and set stress_time accordingly before running")
 @pytest.mark.parametrize("cores_number", [1, 4])
 @pytest.mark.parametrize("cache_config", [(CacheMode.WT, None),
                                           (CacheMode.WA, None),
@@ -101,7 +106,7 @@ def test_stress_small_cas_device(cache_line_size, cores_number, cache_config):
 
     with TestRun.step("Compare md5 sum of exported objects and cores."):
         if md5sum_core_dev != md5sum_core:
-            TestRun.LOGGER.error(f"Md5 sums of core devices and of exported objects are different.")
+            TestRun.LOGGER.error("Md5 sums of core devices and of exported objects are different.")
 
     with TestRun.step("Stop all caches"):
         casadm.stop_all_caches()

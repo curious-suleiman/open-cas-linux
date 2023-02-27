@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
-import time
-import pytest
 from datetime import timedelta
+import time
+
+import pytest
+
 from api.cas import casadm, casadm_parser
 from api.cas.cache_config import CacheLineSize, CacheMode, CleaningPolicy, CacheModeTrait
 from api.cas.init_config import InitConfig
@@ -20,6 +22,7 @@ iterations_per_config = 5
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.parametrizex("cache_mode", CacheMode.with_traits(CacheModeTrait.LazyWrites))
 @pytest.mark.parametrizex("cleaning_policy", CleaningPolicy)
 @pytest.mark.parametrizex("cache_line_size", CacheLineSize)

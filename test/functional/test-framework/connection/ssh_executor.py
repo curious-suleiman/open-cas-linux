@@ -5,10 +5,13 @@
 
 import socket
 import subprocess
+from typing import Tuple, Union, List
+from datetime import timedelta, datetime
+
 import paramiko
 
-from datetime import timedelta, datetime
 from connection.base_executor import BaseExecutor
+from connection.channel import GenericChannel, SshChannel
 from core.test_run import TestRun
 from test_utils.output import Output
 
@@ -105,6 +108,9 @@ class SshExecutor(BaseExecutor):
             raise ValueError("Reboot timeout cannot be negative.")
 
     def reboot(self):
+        """Reboots the target system.
+        """
+
         self.run("reboot")
         self.wait_for_connection_loss()
         self.wait_for_connection(timedelta(seconds=self.reboot_timeout)) \
@@ -140,3 +146,21 @@ class SshExecutor(BaseExecutor):
                 except Exception:
                     return
             raise ConnectionError("Timeout occurred before ssh connection loss")
+        
+    def exec_command(self, command: Union[List[str], str]) -> Tuple[GenericChannel, GenericChannel]:
+        """Run the given command and return (stdout, stderr) as channels.
+        
+        This call is non-blocking.
+
+        TODO: support timeout specification if required
+        """
+        
+        if isinstance(command, list):
+            command = " ".join(command)
+
+        try:
+            stdout, stderr = TestRun.executor.ssh.exec_command(command, get_pty=True)
+        except paramiko.SSHException as e:
+            raise ConnectionError(f"An exception occurred while executing command: {command}\n{e}")
+
+        return SshChannel(stdout.channel), SshChannel(stderr.channel)

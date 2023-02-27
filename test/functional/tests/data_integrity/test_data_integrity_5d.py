@@ -33,6 +33,7 @@ def shuffled_fs_list(n):
     return random.sample(list(itertools.islice(itertools.cycle(Filesystem), n)), n)
 
 
+@pytest.skip("5-day duration - only activate when required")
 @pytest.mark.os_dependent
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core1", DiskTypeLowerThan("cache"))

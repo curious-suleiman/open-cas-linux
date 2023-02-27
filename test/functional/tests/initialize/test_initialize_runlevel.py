@@ -23,6 +23,7 @@ mount_point = "/mnt/test"
 
 
 @pytest.mark.os_dependent
+@pytest.mark.remote_only  # reboot not supported by local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 @pytest.mark.parametrizex("runlevel", [Runlevel.runlevel5, Runlevel.runlevel3])
@@ -35,6 +36,7 @@ def test_init_reboot_runlevels(runlevel, cache_mode):
         pass_criteria:
           - Cache should be loaded successfully after reboot.
     """
+
     with TestRun.step(f"Set runlevel to {runlevel.value}."):
         os_utils.change_runlevel(runlevel)
 

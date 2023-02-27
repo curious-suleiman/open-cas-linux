@@ -5,13 +5,15 @@
 
 import time
 from datetime import timedelta
+from typing import Tuple, Union, List
 
 from core.test_run import TestRun
 from test_utils.output import CmdException
+from connection.channel import GenericChannel
 
 
 class BaseExecutor:
-    def _execute(self, command, timeout):
+    def _execute(self, command: Union[List[str], str], timeout: timedelta):
         raise NotImplementedError()
 
     def _rsync(self, src, dst, delete, symlinks, checksum, exclude_list, timeout,
@@ -70,16 +72,33 @@ class BaseExecutor:
         time.sleep(3)
         self.run(f"kill -s SIGKILL {pid} &> /dev/null")
 
-    def run_expect_success(self, command, timeout: timedelta = timedelta(minutes=30)):
+    def run_expect_success(self, command: Union[List[str], str], timeout: timedelta = timedelta(minutes=30)):
         output = self.run(command, timeout)
         if output.exit_code != 0:
             raise CmdException(f"Exception occurred while trying to execute '{command}' command.",
                                output)
         return output
 
-    def run_expect_fail(self, command, timeout: timedelta = timedelta(minutes=30)):
+    def run_expect_fail(self, command: Union[List[str], str], timeout: timedelta = timedelta(minutes=30)):
         output = self.run(command, timeout)
         if output.exit_code == 0:
             raise CmdException(f"Command '{command}' executed properly but error was expected.",
                                output)
         return output
+    
+    def reboot(self):
+        """Reboots the target system.
+        
+        The implementation (or not) of this method in child classes will depend on the
+        nature of the executor and the target host.
+        """
+        raise NotImplementedError()
+    
+    def exec_command(self, command: Union[List[str], str]) -> Tuple[GenericChannel, GenericChannel]:
+        """Run the given command and return (stdout, stderr) as channels.
+        
+        This call is non-blocking.
+
+        TODO: support timeout specification if required
+        """
+        raise NotImplementedError()

@@ -8,6 +8,7 @@ from core.test_run import TestRun
 from storage_devices.disk import DiskType, DiskTypeSet
 
 
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_plugin("power_control")
 def test_create_example_partitions():

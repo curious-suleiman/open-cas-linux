@@ -13,6 +13,7 @@ from test_tools.fio.fio_param import ReadWrite, IoEngine
 from test_utils.size import Size, Unit
 
 
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 @pytest.mark.require_plugin("power_control")

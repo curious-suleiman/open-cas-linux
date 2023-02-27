@@ -18,6 +18,7 @@ wait_long_time = 180
 wait_short_time = 15
 
 
+@pytest.mark.remote_only  # power cycling not supported on local executor
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 @pytest.mark.require_plugin("power_control")
