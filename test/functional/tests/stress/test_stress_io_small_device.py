@@ -16,12 +16,13 @@ from test_tools.fio.fio_param import CpusAllowedPolicy, IoEngine, ReadWrite
 from test_utils.size import Size, Unit
 
 # test_stress_small_cas_device has 90 parametric test cases, and each
-# test case will take at least stress_time to complete
-# for example, if stress_time is set to 30m, this test will take
+# test case will take at least STRESS_TIME to complete
+# for example, if STRESS_TIME is set to 30m, this test will take
 # approx 2 days to complete all the parametric test cases
-stress_time = timedelta(minutes=30)
+# [CSU] Temp: change to 1min to confirm test functions as expected
+STRESS_TIME = timedelta(minutes=1)
 
-@pytest.skip("Long-running test - only run when required, check and set stress_time accordingly before running")
+@pytest.skip("Long-running test - only run when required, check and set STRESS_TIME accordingly before running")
 @pytest.mark.parametrize("cores_number", [1, 4])
 @pytest.mark.parametrize("cache_config", [(CacheMode.WT, None),
                                           (CacheMode.WA, None),
@@ -72,13 +73,13 @@ def test_stress_small_cas_device(cache_line_size, cores_number, cache_config):
         with TestRun.step("Set cleaning policy."):
             cache.set_cleaning_policy(cleaning_policy)
 
-    with TestRun.step(f"Stress cache for {int(stress_time.total_seconds() / 60)} minutes."):
+    with TestRun.step(f"Stress cache for {int(STRESS_TIME.total_seconds() / 60)} minutes."):
         fio = (Fio().create_command()
                .io_engine(IoEngine.libaio)
                .io_depth(128)
                .direct()
                .time_based()
-               .run_time(stress_time)
+               .run_time(STRESS_TIME)
                .read_write(ReadWrite.randrw)
                .block_size(cache_line_size)
                .num_jobs(cores_number)

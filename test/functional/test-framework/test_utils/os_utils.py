@@ -389,13 +389,13 @@ def kill_all_io():
     TestRun.executor.run("kill -9 `ps aux | grep -i vdbench.* | awk '{ print $2 }'`")
 
     if TestRun.executor.run("pgrep -x dd").exit_code == 0:
-        raise Exception(f"Failed to stop dd!")
+        raise Exception("Failed to stop dd!")
     if TestRun.executor.run("pgrep -x fio").exit_code == 0:
-        raise Exception(f"Failed to stop fio!")
+        raise Exception("Failed to stop fio!")
     if TestRun.executor.run("pgrep -x blktrace").exit_code == 0:
-        raise Exception(f"Failed to stop blktrace!")
+        raise Exception("Failed to stop blktrace!")
     if TestRun.executor.run("pgrep vdbench").exit_code == 0:
-        raise Exception(f"Failed to stop vdbench!")
+        raise Exception("Failed to stop vdbench!")
 
 
 def wait(predicate, timeout: timedelta, interval: timedelta = None):

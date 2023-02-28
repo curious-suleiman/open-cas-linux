@@ -150,7 +150,8 @@ class SshExecutor(BaseExecutor):
     def exec_command(self, command: Union[List[str], str]) -> Tuple[GenericChannel, GenericChannel]:
         """Run the given command and return (stdout, stderr) as channels.
         
-        This call is non-blocking.
+        This call is non-blocking with respect to the given command i.e. it does not block until the
+        command is finished.
 
         TODO: support timeout specification if required
         """
@@ -159,7 +160,7 @@ class SshExecutor(BaseExecutor):
             command = " ".join(command)
 
         try:
-            stdout, stderr = TestRun.executor.ssh.exec_command(command, get_pty=True)
+            stdout, stderr = self.ssh.exec_command(command, get_pty=True)
         except paramiko.SSHException as e:
             raise ConnectionError(f"An exception occurred while executing command: {command}\n{e}")
 

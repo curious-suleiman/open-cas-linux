@@ -23,7 +23,7 @@ def check_progress_bar(command: str, progress_bar_expected: bool = True):
             TestRun.fail("Progress bar did not appear in 10 seconds.")
     else:
         if not progress_bar_expected:
-            TestRun.fail("Progress bar appear when output was redirected to a file.")
+            TestRun.fail("Progress bar appeared when output was redirected to a file.")
 
     percentage = 0
     while True:

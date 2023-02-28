@@ -3,16 +3,28 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
+import asyncio
 import subprocess
 from datetime import timedelta
 from typing import Tuple, Union, List
+import weakref
 
 from connection.base_executor import BaseExecutor
 from connection.channel import GenericChannel, LocalChannel, ChannelType
 from test_utils.output import Output
 
+def finalize_event_loop(loop):
+    if loop.is_closed():
+        return
+    if loop.is_running():
+        loop.stop()
+    loop.close()
 
 class LocalExecutor(BaseExecutor):
+
+    _finalizer = None
+    _loop = None        # asyncio event loop
+
     def _execute(self, command: Union[List[str], str], timeout: timedelta):
         completed_process = subprocess.run(
             command,
@@ -57,17 +69,36 @@ class LocalExecutor(BaseExecutor):
     def exec_command(self, command: Union[List[str], str]) -> Tuple[GenericChannel, GenericChannel]:
         """Run the given command and return (stdout, stderr) as channels.
         
-        This call is non-blocking.
+        This call is non-blocking with respect to the given command i.e. it does not block until the
+        command is finished.
 
         TODO: support timeout specification if required
         """
         
-        process: subprocess.Popen = subprocess.Popen(
-            command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+        if isinstance(command, list):
+            command = " ".join(command)
+
+        if self._loop is None:
+            # create a new event loop, and also attach a finalizer to clean it up
+            event_loop = asyncio.new_event_loop()
+            self._loop = event_loop
+            # TODO: consider using asyncio.set_event_loop(event_loop) to avoid the need to pass
+            # this loop through to created channels
+
+            # define a finalizer to stop/close the event loop when this object is finalized
+            self._finalizer = weakref.finalize(self, finalize_event_loop, event_loop)
+
+        # TODO: add a finalizer to terminate this process if it is still running when this object is finalized
+        # need to figure out how to ensure the process terminator is called before the event loop finalizer
+        # above however, as if the event loop is closed before the process exits and the process is still writing
+        # to stdout/stderr, one or more exceptions will be thrown
+        process = self._loop.run_until_complete(
+            asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
         )
 
-        return LocalChannel(process, ChannelType.STDOUT), LocalChannel(process, ChannelType.STDERR)
+        return LocalChannel(self._loop, process, ChannelType.STDOUT), LocalChannel(self._loop, process, ChannelType.STDERR)
 

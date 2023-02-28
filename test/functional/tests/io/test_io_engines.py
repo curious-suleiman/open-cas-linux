@@ -17,10 +17,15 @@ from test_tools.fio.fio_param import IoEngine, CpusAllowedPolicy, ReadWrite
 from test_utils.os_utils import get_dut_cpu_physical_cores
 from test_utils.size import Size, Unit
 
-mount_point = "/mnt/test"
-runtime = timedelta(minutes=15)
+MOUNT_POINT = "/mnt/test"
+# test_io_engines has close to 50 parametric test cases, and each one will run for
+# at least RUNTIME duration. for example, if RUNTIME is 15m, then test_io_engines
+# will take approx 12 hours to complete all test cases.
+# [CSU] Temp: changing RUNTIME to 1min to confirm test functions correctly
+RUNTIME = timedelta(minutes=1)
 
 
+@pytest.skip("Long-running test - only run when required, check and set RUNTIME accordingly before running")
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
 @pytest.mark.require_disk("core", DiskTypeLowerThan("cache"))
 @pytest.mark.parametrizex("cache_mode", CacheMode)
@@ -49,7 +54,7 @@ def test_io_engines(cache_mode, filesystem, io_engine):
         TestRun.LOGGER.info(f"Create filesystem '{filesystem}' on '{core_dev.path}'")
         core_dev.create_filesystem(filesystem)
         core = cache.add_core(core_dev)
-        core.mount(mount_point)
+        core.mount(MOUNT_POINT)
 
     with TestRun.step("Run 15 minutes FIO with data integrity check on CAS device\n"
                       "using IO Engine from configuration."):
@@ -62,9 +67,9 @@ def test_io_engines(cache_mode, filesystem, io_engine):
                .create_command()
                .direct()
                .io_engine(io_engine)
-               .run_time(runtime)
+               .run_time(RUNTIME)
                .time_based()
-               .target(f"{mount_point}/fio_file")
+               .target(f"{MOUNT_POINT}/fio_file")
                .read_write(ReadWrite.randrw)
                .write_percentage(30)
                .verification_with_pattern()

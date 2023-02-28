@@ -97,7 +97,8 @@ class BaseExecutor:
     def exec_command(self, command: Union[List[str], str]) -> Tuple[GenericChannel, GenericChannel]:
         """Run the given command and return (stdout, stderr) as channels.
         
-        This call is non-blocking.
+        This call is non-blocking with respect to the given command i.e. it does not block until the
+        command is finished.
 
         TODO: support timeout specification if required
         """

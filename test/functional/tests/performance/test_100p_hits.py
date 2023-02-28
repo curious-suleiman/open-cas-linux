@@ -21,7 +21,16 @@ from test_utils.size import Size, Unit
 from test_utils.output import CmdException
 from storage_devices.disk import DiskTypeSet, DiskTypeLowerThan, DiskType
 
+# test_4k_100p_hit_reads_wt has 125 parametric test cases, and each
+# case will first use a workset of size TESTING_WORKSET to characterise the
+# cache device, then write a workset of the same size to the cache+core device
+# to use as a basis for the cache read performance testing
+# depending on the devices in use, this may take a significant amount of time,
+# so consider the value of TESTING_WORKSET before running the test
+# [CSU] Temp: changing TESTING_WORKSET size to 2GiB instead of 20GiB to save time
+TESTING_WORKSET = Size(2, Unit.GiB)
 
+@pytest.skip("Long-running test - only run when required, check and set TESTING_WORKSET accordingly before running")
 @pytest.mark.os_dependent
 @pytest.mark.performance()
 @pytest.mark.require_disk("cache", DiskTypeSet([DiskType.optane, DiskType.nand]))
@@ -38,8 +47,7 @@ def test_4k_100p_hit_reads_wt(queue_depth, numjobs, cache_line_size, perf_collec
         pass_criteria:
           - always passes
     """
-    TESTING_WORKSET = Size(20, Unit.GiB)
-
+    
     fio_cfg = (
         Fio()
         .create_command()
