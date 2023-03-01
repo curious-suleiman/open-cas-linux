@@ -55,7 +55,7 @@ def test_progress_bar_big_files():
 
     with TestRun.step("Run command and check progress."):
         # TEMP: pause here
-        TestRun.LOGGER.info("TEMP: Sleeping for 20min...")
-        time.sleep(1200)
+        # TestRun.LOGGER.info("TEMP: Sleeping for 20min...")
+        # time.sleep(1200)
         cmd = cli.flush_cache_cmd(str(cache.cache_id))
         check_progress_bar(cmd)

@@ -14,15 +14,16 @@ from test_utils.os_utils import wait
 def check_progress_bar(command: str, progress_bar_expected: bool = True):
     TestRun.LOGGER.info(f"Check progress for command: {command}")
     
-    stdout, stderr = TestRun.executor.exec_command(command)
+    # stdout, stderr = TestRun.executor.exec_command(command)
     #TEMP: substituting command with a simple python block to test process output reading
-    # py_cmd = """
-    # import time
-    # for i in range(10):
-    #     print(i)
-    #     time.sleep(5)
-    # """
-    # stdout, stderr = TestRun.executor.exec_command(f"python -c '{textwrap.dedent(py_cmd)}'")
+    py_cmd = """
+    import time
+    import sys
+    for i in range(10):
+        sys.stdout.write(i)
+        time.sleep(5)
+    """
+    stdout, stderr = TestRun.executor.exec_command(f"python -c '{textwrap.dedent(py_cmd)}'")
 
     # TEMP: extend timeout for waiting for output to appear
     if not wait(lambda: stdout.ready(), timedelta(seconds=120), timedelta(seconds=1)):
