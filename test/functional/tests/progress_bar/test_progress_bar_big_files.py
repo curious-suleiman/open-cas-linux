@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 #
 
+import time
+
 import pytest
 from api.cas import casadm, cli
 from api.cas.cache_config import CacheMode, CleaningPolicy, SeqCutOffPolicy
@@ -52,5 +54,8 @@ def test_progress_bar_big_files():
         create_random_test_file(test_file_path, cache.size + Size(1, Unit.GibiByte))
 
     with TestRun.step("Run command and check progress."):
+        # TEMP: pause here
+        TestRun.LOGGER.info("TEMP: Sleeping for 20min...")
+        time.sleep(1200)
         cmd = cli.flush_cache_cmd(str(cache.cache_id))
         check_progress_bar(cmd)

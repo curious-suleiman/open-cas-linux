@@ -160,7 +160,7 @@ class SshExecutor(BaseExecutor):
             command = " ".join(command)
 
         try:
-            stdout, stderr = self.ssh.exec_command(command, get_pty=True)
+            _, stdout, stderr = self.ssh.exec_command(command, get_pty=True)
         except paramiko.SSHException as e:
             raise ConnectionError(f"An exception occurred while executing command: {command}\n{e}")
 

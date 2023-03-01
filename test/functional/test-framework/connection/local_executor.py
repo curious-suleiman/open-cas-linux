@@ -8,12 +8,39 @@ import subprocess
 from datetime import timedelta
 from typing import Tuple, Union, List
 import weakref
+import pty
+import os
 
 from connection.base_executor import BaseExecutor
 from connection.channel import GenericChannel, LocalChannel, ChannelType
 from test_utils.output import Output
+from core.test_run import TestRun
 
-def finalize_event_loop(loop):
+def finalize_event_loop(loop, loop_dependent_processes,
+                        open_file_descriptors):
+    # send every process a termination signal first, then
+    # await each process in order
+    if loop_dependent_processes is not None:
+        for p in loop_dependent_processes:
+            if p.returncode is None: # process is still running
+                p.terminate()
+        for p in loop_dependent_processes:
+            p_stdout, p_stderr = loop.run_until_complete(p.communicate())
+            # TEMP: dump any output received from the process during termination
+            if p_stdout is not None and len(p_stdout) > 0:
+                TestRun.LOGGER.debug("Received output on process stdout during finalization:")
+                for line in p_stdout:
+                    TestRun.LOGGER.debug(f"    {line}\n")
+            if p_stderr is not None and len(p_stderr) > 0:
+                TestRun.LOGGER.debug("Received output on process stderr during finalization:")
+                for line in p_stderr:
+                    TestRun.LOGGER.debug(f"    {line}\n")
+
+    if open_file_descriptors is not None:
+        # close all open file descriptors
+        for fd in open_file_descriptors:
+            os.close(fd)
+
     if loop.is_closed():
         return
     if loop.is_running():
@@ -24,6 +51,8 @@ class LocalExecutor(BaseExecutor):
 
     _finalizer = None
     _loop = None        # asyncio event loop
+    _loop_dependent_processes = None
+    _open_file_descriptors = None
 
     def _execute(self, command: Union[List[str], str], timeout: timedelta):
         completed_process = subprocess.run(
@@ -81,24 +110,44 @@ class LocalExecutor(BaseExecutor):
         if self._loop is None:
             # create a new event loop, and also attach a finalizer to clean it up
             event_loop = asyncio.new_event_loop()
-            self._loop = event_loop
             # TODO: consider using asyncio.set_event_loop(event_loop) to avoid the need to pass
             # this loop through to created channels
+            self._loop = event_loop
+            
+            # This double assignment is done so that this object has a reference to the list
+            # of loop dependend processes that is sent to the finalizer, but does not own it
+            # This avoids encoding a dependency on this object in the finalizer arguments, which
+            # results in the object being impossible to clean up
+            loop_dependent_processes = []
+            self._loop_dependent_processes = loop_dependent_processes
+            open_file_descriptors = []
+            self._open_file_descriptors = open_file_descriptors
 
             # define a finalizer to stop/close the event loop when this object is finalized
-            self._finalizer = weakref.finalize(self, finalize_event_loop, event_loop)
+            self._finalizer = weakref.finalize(self, finalize_event_loop, event_loop,
+                                               loop_dependent_processes,
+                                               open_file_descriptors)
 
-        # TODO: add a finalizer to terminate this process if it is still running when this object is finalized
-        # need to figure out how to ensure the process terminator is called before the event loop finalizer
-        # above however, as if the event loop is closed before the process exits and the process is still writing
-        # to stdout/stderr, one or more exceptions will be thrown
+        # construct pseudo-terminals for stdin/stdout/stderr
+        parent_in, child_in = pty.openpty()
+        parent_out, child_out = pty.openpty()
+        parent_err, child_err = pty.openpty()
+
         process = self._loop.run_until_complete(
             asyncio.create_subprocess_shell(
                 command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stdin=child_in,
+                stdout=child_out,
+                stderr=child_err
             )
         )
+        # not interested in sending any input, so close these fds to ensure the child process
+        # gets EOF on stdin
+        # TODO: review whether this is necessary/accurate
+        os.close(parent_in)
+        os.close(child_in)
+        self._loop_dependent_processes.append(process)
+        self._open_file_descriptors.extend((parent_out, child_out, parent_err, child_err))
 
-        return LocalChannel(self._loop, process, ChannelType.STDOUT), LocalChannel(self._loop, process, ChannelType.STDERR)
-
+        return (LocalChannel(self._loop, process, file_descriptor=parent_out),
+                LocalChannel(self._loop, process, file_descriptor=parent_err))
